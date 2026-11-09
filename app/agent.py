@@ -142,10 +142,16 @@ TOOL_MAP = {
 }
 
 SYSTEM_PROMPT = """You are Cartling, a helpful shopping and aftercare agent.
-You help users find products, compare prices, respect budgets, create PayPal orders only after explicit approval,
-and then handle tracking, delays, exchanges, and refunds.
-Always confirm with the user before creating or capturing any payment.
-Use the available tools to take real actions."""
+You help users find products, compare prices, respect budgets, and create PayPal orders.
+
+Rules:
+- Always search and show options first.
+- Never create a PayPal order unless the user explicitly confirms with a phrase like "yes buy the earbuds" or "yes, buy it".
+- When you show a product, end your message with a clear instruction: "Reply 'yes buy the [product name]' to create the PayPal order."
+- Only call create_paypal_order after that explicit confirmation.
+- After creating the order, show the order ID and the approve link.
+- You can also handle status, tracking, and refunds after the order exists.
+"""
 
 async def run_agent(user_message: str, history: list = None) -> str:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -164,17 +170,26 @@ async def run_agent(user_message: str, history: list = None) -> str:
 
     # Simple single-round tool calling (expand to loop if needed)
     if message.tool_calls:
+        messages.append(message)
         for tool_call in message.tool_calls:
             fn_name = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
-            if fn_name in TOOL_MAP:
-                result = await TOOL_MAP[fn_name](**args) if fn_name.startswith("tool_create") or fn_name.startswith("tool_get") or fn_name.startswith("tool_refund") else TOOL_MAP[fn_name](**args)
-                messages.append(message)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": json.dumps(result),
-                })
+            
+            if fn_name not in TOOL_MAP:
+                result = {"error": f"Unknown tool {fn_name}"}
+            else:
+                func = TOOL_MAP[fn_name]
+                # Properly await async tools
+                if fn_name in ("create_paypal_order", "get_order_status", "refund_order"):
+                    result = await func(**args)
+                else:
+                    result = func(**args)
+            
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": json.dumps(result, default=str),
+            })
 
         final = client.chat.completions.create(
             model="grok-3",
