@@ -1,0 +1,21 @@
+[
+  {
+    "id": "earbuds-1",
+    "name": "Noise-Cancelling Earbuds",
+    "description": "Active noise cancelling, 30h battery",
+    "stores": [
+      {"store": "TechStore", "price": 79.99},
+      {"store": "GadgetHub", "price": 74.50},
+      {"store": "BudgetBuy", "price": 69.99}
+    ]
+  },
+  {
+    "id": "case-1",
+    "name": "Clear Phone Case",
+    "description": "Shockproof clear case",
+    "stores": [
+      {"store": "TechStore", "price": 14.99},
+      {"store": "GadgetHub", "price": 12.50}
+    ]
+  }
+]

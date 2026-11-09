@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+httpx
+python-dotenv
+pydantic
+openai  # or the xAI SDK if you prefer
+python-multipart
