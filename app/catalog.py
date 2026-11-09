@@ -10,9 +10,12 @@ def load_catalog():
 def search_and_compare(query: str, max_price: float) -> dict:
     products = load_catalog()
     results = []
-    query_lower = query.lower()
+    query_words = query.lower().replace("-", " ").split()
+    
     for p in products:
-        if query_lower in p["name"].lower() or query_lower in p["description"].lower():
+        name_desc = (p["name"] + " " + p["description"]).lower().replace("-", " ")
+        # Match if any important word from the query appears
+        if any(word in name_desc for word in query_words if len(word) > 3):
             cheapest = min(p["stores"], key=lambda s: s["price"])
             if cheapest["price"] <= max_price:
                 results.append({
