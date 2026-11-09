@@ -52,7 +52,17 @@ class PayPalClient:
             r.raise_for_status()
             return r.json()
 
-    async def refund_order(self, capture_id: str, amount: str = None):
-        # Implement using the refund endpoint after you have a capture
-        # See PayPal docs for /v2/payments/captures/{capture_id}/refund
-        pass
+    async def refund_capture(self, capture_id: str, amount: str = None):
+        if not self.token:
+            await self.get_token()
+        payload = {}
+        if amount:
+            payload = {"amount": {"value": amount, "currency_code": "USD"}}
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{self.base}/v2/payments/captures/{capture_id}/refund",
+                headers={"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"},
+                json=payload,
+            )
+            r.raise_for_status()
+            return r.json()

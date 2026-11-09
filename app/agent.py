@@ -1,6 +1,5 @@
 import os
 import json
-from typing import Any
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -11,14 +10,12 @@ client = OpenAI(
     base_url="https://api.x.ai/v1",
 )
 
-# Import your other modules
 from app.paypal_client import PayPalClient
 from app.catalog import search_and_compare, build_cart
 from app.order_store import get_order, save_order, update_tracking
 
 paypal = PayPalClient()
 
-# Tool implementations
 def tool_search_and_compare(query: str, max_price: float) -> dict:
     return search_and_compare(query, max_price)
 
@@ -34,8 +31,12 @@ async def tool_get_order_status(order_id: str) -> dict:
     return await paypal.get_order(order_id)
 
 async def tool_refund_order(order_id: str) -> dict:
-    # Implement after you have capture_id from the order
-    return {"status": "refund_initiated", "order_id": order_id}
+    order = await paypal.get_order(order_id)
+    captures = order.get("purchase_units", [{}])[0].get("payments", {}).get("captures", [])
+    if not captures:
+        return {"error": "No capture found. Order may not be approved/captured yet."}
+    capture_id = captures[0]["id"]
+    return await paypal.refund_capture(capture_id)
 
 def tool_update_tracking(order_id: str, status: str, message: str) -> dict:
     return update_tracking(order_id, status, message)
@@ -152,8 +153,8 @@ When the user says "yes buy the [product]":
 - Call create_paypal_order with the correct total and a short summary.
 - Reply with the Order ID and the approve link.
 
+If the user asks for status or refund, use get_order_status or refund_order with the order ID.
 Never create an order without the explicit "yes buy" confirmation.
-After an order exists you can also check status or refund if asked.
 """
 
 async def run_agent(user_message: str, history: list = None) -> str:
@@ -163,7 +164,7 @@ async def run_agent(user_message: str, history: list = None) -> str:
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="grok-3",  # or the latest Grok model available
+        model="grok-3",
         messages=messages,
         tools=TOOLS,
         tool_choice="auto",
@@ -171,7 +172,6 @@ async def run_agent(user_message: str, history: list = None) -> str:
 
     message = response.choices[0].message
 
-    # Simple single-round tool calling (expand to loop if needed)
     if message.tool_calls:
         messages.append(message)
         for tool_call in message.tool_calls:
@@ -182,7 +182,6 @@ async def run_agent(user_message: str, history: list = None) -> str:
                 result = {"error": f"Unknown tool {fn_name}"}
             else:
                 func = TOOL_MAP[fn_name]
-                # Properly await async tools
                 if fn_name in ("create_paypal_order", "get_order_status", "refund_order"):
                     result = await func(**args)
                 else:
