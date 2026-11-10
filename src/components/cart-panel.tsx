@@ -145,18 +145,22 @@ export function CartPanel({
         </p>
       </section>
       <section className="flex flex-col gap-3">
-        <h2 className="font-display text-2xl font-medium">Purchases</h2>
+        <h2 className="font-display text-2xl font-medium">Your orders</h2>
         {orders.length === 0 ? (
-          <p className="text-sm text-muted">Refunds and status live here after you pay. A refund stops counting those items as yours.</p>
+          <p className="text-sm text-muted">Paid and refunded orders stay here, including after you start a new chat.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {[...orders].reverse().map((order) => (
               <li key={order.id} className="rounded-xl border border-line px-3 py-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="font-medium">{order.id}</p>
+                  <p className="font-medium">{order.status === "paid" ? "Paid" : "Refunded"}</p>
                   <p className="text-sm tabular-nums">{money(order.total)}</p>
                 </div>
-                <p className="text-sm text-muted capitalize">{order.status}</p>
+                <p className="text-sm text-muted">
+                  <time dateTime={new Date(order.created).toISOString()}>{when(order.created)}</time>
+                  {" · "}
+                  {order.id}
+                </p>
                 <ul className="mt-2 flex flex-col gap-1 text-sm text-muted">
                   {order.lines.map((line) => (
                     <li key={`${order.id}-${line.productId}`}>
@@ -166,9 +170,13 @@ export function CartPanel({
                 </ul>
                 {order.status === "paid" ? (
                   <button type="button" className="mt-2 min-h-11 text-sm font-medium text-alert" onClick={() => onRefund(order.id)}>
-                    Refund {order.id}
+                    Refund {money(order.total)}
                   </button>
-                ) : null}
+                ) : (
+                  <p className="mt-2 text-sm text-muted">
+                    {order.paypalOrderId ? "The refund went back through PayPal." : "This order was refunded."}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
@@ -176,6 +184,10 @@ export function CartPanel({
       </section>
     </div>
   );
+}
+
+function when(created: number): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(created);
 }
 
 function groupLines(lines: CartLine[]): { store: string; lines: CartLine[] }[] {
