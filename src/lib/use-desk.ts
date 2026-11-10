@@ -36,12 +36,13 @@ type DeskState = {
     stores?: Record<string, string>;
     paypalRefundId?: string;
     needAddress?: boolean;
+    statusIds?: string[];
   };
   replaceTurn: (id: string, text: string, patch?: Partial<Turn>) => void;
   setQty: (productId: string, qty: number) => void;
   setStore: (productId: string, store: string) => boolean;
   pay: () => string | null;
-  note: (text: string) => void;
+  note: (text: string, steps?: string[]) => void;
   recordPaid: (order: Order, clearCart: boolean) => void;
   refund: (id: string, quiet?: boolean) => void;
 };
@@ -113,13 +114,16 @@ export const useDesk = create<DeskState>()(
           recommendStore: result.recommendStore,
           stores: result.stores,
           actions: result.actions,
+          steps: result.steps ?? agentSteps(result, clean),
         });
         const paypalRefund = (result.orders ?? []).find((order) => {
           const prev = desk.orders.find((row) => row.id === order.id);
           return order.status === "refunded" && prev?.status === "paid" && Boolean(prev.paypalOrderId);
         });
         if (paypalRefund) {
-          const pending = newTurn("cartling", `Sending ${paypalRefund.id} back through PayPal.`);
+          const pending = newTurn("cartling", `Sending ${paypalRefund.id} back through PayPal.`, {
+            steps: ["Asked PayPal to refund the capture", paypalRefund.id],
+          });
           const turns = [...desk.turns, newTurn("you", display?.trim() || clean), pending].slice(-40);
           set(saved(desk, turns));
           return {
@@ -146,6 +150,7 @@ export const useDesk = create<DeskState>()(
           recommendId: result.recommendId,
           stores: result.stores,
           needAddress: result.needAddress,
+          statusIds: result.statusIds,
         };
       },
       replaceTurn: (id, text, patch) => {
@@ -188,9 +193,9 @@ export const useDesk = create<DeskState>()(
         set({ ...saved(desk, turns), lines: [], orders: [...desk.orders, order] });
         return order.id;
       },
-      note: (text) => {
+      note: (text, steps) => {
         const desk = get();
-        set(saved(desk, [...desk.turns, newTurn("cartling", text)].slice(-40)));
+        set(saved(desk, [...desk.turns, newTurn("cartling", text, steps ? { steps } : undefined)].slice(-40)));
       },
       recordPaid: (order, clearCart) => {
         const desk = get();
@@ -198,7 +203,9 @@ export const useDesk = create<DeskState>()(
         const packs = `${stores.length} package${stores.length === 1 ? "" : "s"}: ${stores.join(", ")}`;
         const turns = [
           ...desk.turns,
-          newTurn("cartling", `Paid ${order.id} for ${money(order.total)} through PayPal. ${packs}. Refund sends it back through PayPal.`),
+          newTurn("cartling", `Paid ${order.id} for ${money(order.total)} through PayPal. ${packs}. Refund sends it back through PayPal.`, {
+            steps: ["Captured the PayPal order", order.paypalCaptureId ? `Capture ${order.paypalCaptureId} is COMPLETED` : "PayPal status COMPLETED"],
+          }),
         ].slice(-40);
         set({
           ...saved(desk, turns),
@@ -212,7 +219,9 @@ export const useDesk = create<DeskState>()(
         if (!order) return;
         const turns = quiet
           ? desk.turns
-          : [...desk.turns, newTurn("cartling", `Refunded ${id}${order.paypalOrderId ? " through PayPal" : ""}. ${money(order.total)} is released.`)].slice(-40);
+          : [...desk.turns, newTurn("cartling", `Refunded ${id}${order.paypalOrderId ? " through PayPal" : ""}. ${money(order.total)} is released.`, {
+              steps: order.paypalOrderId ? ["Refunded the PayPal capture", "PayPal status REFUNDED"] : ["Marked the order refunded"],
+            })].slice(-40);
         set({
           ...saved(desk, turns),
           orders: desk.orders.map((row) => (row.id === id ? { ...row, status: "refunded" as const } : row)),
@@ -254,6 +263,19 @@ function saved(desk: { chats: Chat[]; activeId: string; turns: Turn[] }, turns: 
   const rest = desk.chats.filter((row) => row.id !== id);
   const chats = turns.length ? [chat, ...rest].slice(0, 30) : rest;
   return { activeId: id, turns, chats };
+}
+
+function agentSteps(result: { needAddress?: boolean; webQuery?: string; products?: string[]; recommendStore?: string; say: string }, text: string): string[] {
+  const steps: string[] = [];
+  if (result.needAddress) steps.push("Stopped. A day window needs a ship-to address");
+  if (result.products?.length) {
+    steps.push("Checked the catalog");
+    if (namesADay(text)) steps.push("Dropped stores that miss the named day");
+    if (result.recommendStore) steps.push(`Kept ${result.recommendStore}`);
+  }
+  if (/did not add|over the ceiling|break the ceiling/i.test(result.say)) steps.push("Refused the add. It is over the ceiling");
+  if (result.webQuery) steps.push("Nothing in the aisle matched");
+  return steps;
 }
 
 function namesADay(text: string): boolean {

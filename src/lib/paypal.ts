@@ -26,7 +26,7 @@ export async function startCheckout(body: {
   budget: number;
   webId?: string;
   address?: ShipTo;
-}): Promise<{ ok: boolean; approveUrl?: string; error?: string }> {
+}): Promise<{ ok: boolean; approveUrl?: string; orderId?: string; error?: string }> {
   try {
     const res = await fetch("/api/checkout", {
       method: "POST",
@@ -34,9 +34,9 @@ export async function startCheckout(body: {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),
     });
-    const data = (await res.json()) as { ok?: boolean; approveUrl?: string; error?: string };
+    const data = (await res.json()) as { ok?: boolean; approveUrl?: string; orderId?: string; error?: string };
     if (!res.ok || !data.approveUrl) return { ok: false, error: data.error || "PayPal did not open" };
-    return { ok: true, approveUrl: data.approveUrl };
+    return { ok: true, approveUrl: data.approveUrl, orderId: data.orderId };
   } catch {
     return { ok: false, error: "PayPal took too long. Try the pay button again." };
   }
@@ -75,6 +75,17 @@ export async function capturePaypal(orderId: string): Promise<{
     };
   } catch {
     return { ok: false, error: "PayPal capture did not answer" };
+  }
+}
+
+export async function paypalStatus(orderId: string): Promise<{ ok: boolean; label?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { signal: AbortSignal.timeout(20000) });
+    const data = (await res.json()) as { ok?: boolean; status?: string; error?: string };
+    if (!res.ok || !data.ok || !data.status) return { ok: false, error: data.error || "PayPal did not return a status" };
+    return { ok: true, label: data.status };
+  } catch {
+    return { ok: false, error: "PayPal status did not answer" };
   }
 }
 

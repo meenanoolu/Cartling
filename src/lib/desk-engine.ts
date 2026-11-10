@@ -42,6 +42,7 @@ export type Turn = {
   stores?: Record<string, string>;
   actions?: TurnAction[];
   hits?: { id: string; name: string; price: number; store: string; image: string; blurb: string }[];
+  steps?: string[];
 };
 
 export type ShipTo = {
@@ -77,6 +78,8 @@ export type EngineResult = {
   polish: boolean;
   webQuery?: string;
   needAddress?: boolean;
+  statusIds?: string[];
+  steps?: string[];
 };
 
 const SETS: { test: RegExp; ids: string[]; name: string }[] = [
@@ -238,15 +241,16 @@ export function interpret(raw: string, desk: DeskSnapshot): EngineResult {
   }
 
   if (/\b(status|where is|tracking|track|receipts?)\b/.test(text)) {
-    if (desk.orders.length === 0) return { say: "No receipts yet. The cart is the only thing in motion.", polish: false };
-    const lines = desk.orders
-      .slice(-3)
-      .map((order) => {
-        const packs = new Set(order.lines.map((line) => line.store)).size;
-        return `${order.id} · ${order.status} · ${money(order.total)} · ${packs} package${packs === 1 ? "" : "s"}`;
-      })
-      .join(" ");
-    return { say: lines, polish: false };
+    const paypalIds = desk.orders.map((order) => order.paypalOrderId).filter((id): id is string => Boolean(id)).slice(-3);
+    if (paypalIds.length === 0) {
+      return { say: "No PayPal order to check yet. Pay once and ask again.", polish: false, steps: ["No PayPal order to check"] };
+    }
+    return {
+      say: "Checking those orders with PayPal.",
+      statusIds: paypalIds,
+      polish: false,
+      steps: ["Asked PayPal for the order status"],
+    };
   }
 
   if (/\b(change|update|edit)\s+(my\s+)?address\b|\bship(?:ping)? address\b/.test(text) || (limit != null && !desk.shipTo)) {

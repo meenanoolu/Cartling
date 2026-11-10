@@ -7,7 +7,7 @@ import { useDesk } from "@/lib/use-desk";
 import { ProductCard } from "@/components/product-card";
 import { CartPanel } from "@/components/cart-panel";
 import { WebCard } from "@/components/web-card";
-import { adviseStore, capturePaypal, refundPaypal, searchWeb, serviceHealth, startCheckout } from "@/lib/paypal";
+import { adviseStore, capturePaypal, paypalStatus, refundPaypal, searchWeb, serviceHealth, startCheckout } from "@/lib/paypal";
 
 const STARTERS = [
   { label: "Earbuds under $80", run: "Noise-cancelling earbuds under 80" },
@@ -102,8 +102,27 @@ export function DeskApp() {
       const refunded = await refundPaypal(result.paypalRefundId);
       if (refunded.ok) {
         refund(result.paypalRefundId, true);
-        replaceTurn(result.turnId, `Refunded ${result.paypalRefundId} through PayPal.`);
+        replaceTurn(result.turnId, `Refunded ${result.paypalRefundId} through PayPal.`, {
+          steps: ["Asked PayPal to refund the capture", "PayPal status REFUNDED"],
+        });
       } else replaceTurn(result.turnId, refunded.error || "PayPal did not refund that.");
+      setBusy(null);
+      return;
+    }
+    if (result.statusIds && result.turnId) {
+      setBusy("Asking PayPal");
+      const lines: string[] = [];
+      const steps = ["Asked PayPal for the order status"];
+      for (const id of result.statusIds) {
+        const status = await paypalStatus(id);
+        if (status.ok && status.label) {
+          lines.push(`${id} is ${status.label}`);
+          steps.push(`${id} is ${status.label}`);
+        } else {
+          lines.push(`${id} - ${status.error || "PayPal did not return a status"}`);
+        }
+      }
+      replaceTurn(result.turnId, lines.join(". "), { steps });
       setBusy(null);
       return;
     }
@@ -111,7 +130,10 @@ export function DeskApp() {
       setBusy("Asking Channel3");
       const found = await searchWeb(result.webQuery, useDesk.getState().budget);
       if (found.ok && found.results.length) {
-        replaceTurn(result.turnId, "Channel3 found these. PayPal charges the price on the card.", { hits: found.results });
+        replaceTurn(result.turnId, "Channel3 found these. PayPal charges the price on the card.", {
+          hits: found.results,
+          steps: ["Nothing in the aisle matched", "Asked Channel3", "Kept the price Channel3 returned"],
+        });
       } else replaceTurn(result.turnId, found.error || "Channel3 had nothing under that ceiling.");
       setBusy(null);
       return;
@@ -127,6 +149,7 @@ export function DeskApp() {
           replaceTurn(result.turnId, advice.text, {
             recommendStore: advice.store,
             stores: { ...result.stores, [result.recommendId]: advice.store },
+            steps: [...(turn?.steps ?? ["Checked the catalog"]), `Grok picked ${advice.store} from the allowed stores`],
             actions: turn?.actions?.map((action) =>
               previous && action.run === `add ${result.recommendId} from ${previous}`
                 ? { ...action, run: `add ${result.recommendId} from ${advice.store}` }
@@ -159,6 +182,7 @@ export function DeskApp() {
       address: state.shipTo,
     });
     if (opened.approveUrl) {
+      if (opened.orderId) note(`Opened PayPal order ${opened.orderId}.`, ["Created a PayPal sandbox order", opened.orderId]);
       window.location.href = opened.approveUrl;
       return;
     }
@@ -176,6 +200,7 @@ export function DeskApp() {
     setPaying(true);
     const opened = await startCheckout({ webId: id, budget: state.budget, address: state.shipTo });
     if (opened.approveUrl) {
+      if (opened.orderId) note(`Opened PayPal order ${opened.orderId}.`, ["Created a PayPal sandbox order", opened.orderId]);
       window.location.href = opened.approveUrl;
       return;
     }
@@ -314,6 +339,13 @@ export function DeskApp() {
                   }
                 >
                   <p className={turn.role === "you" ? "leading-relaxed" : "max-w-2xl leading-relaxed"}>{turn.text}</p>
+                  {turn.role === "cartling" && turn.steps?.length ? (
+                    <ol className="mt-2 flex max-w-2xl list-decimal flex-col gap-1 pl-5 text-sm text-muted">
+                      {turn.steps.map((step, index) => (
+                        <li key={`${turn.id}-${index}`}>{step}</li>
+                      ))}
+                    </ol>
+                  ) : null}
                   {turn.actions?.length ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {turn.actions.map((action) => (
