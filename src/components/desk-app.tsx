@@ -283,7 +283,15 @@ export function DeskApp() {
       <div className="mx-auto grid w-full max-w-6xl min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-4 py-2" role="navigation" aria-label="Chats">
-            <button type="button" className="min-h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-on-brass" onClick={() => newChat()}>
+            <button
+              type="button"
+              className="min-h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-on-brass"
+              onClick={() => {
+                setAddressOpen(false);
+                setPendingAsk(null);
+                newChat();
+              }}
+            >
               New chat
             </button>
             <button
@@ -299,7 +307,11 @@ export function DeskApp() {
                 type="button"
                 aria-current={chat.id === activeId ? "true" : undefined}
                 className={`min-h-11 max-w-56 shrink-0 truncate rounded-full border px-4 text-left text-sm ${chat.id === activeId ? "border-ink bg-sheet font-medium" : "border-line"}`}
-                onClick={() => openChat(chat.id)}
+                onClick={() => {
+                  setAddressOpen(false);
+                  setPendingAsk(null);
+                  openChat(chat.id);
+                }}
               >
                 {chat.title}
               </button>
