@@ -66,3 +66,13 @@ class PayPalClient:
             )
             r.raise_for_status()
             return r.json()
+    async def capture_order(self, order_id: str):
+        if not self.token:
+            await self.get_token()
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{self.base}/v2/checkout/orders/{order_id}/capture",
+                headers={"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"},
+            )
+            r.raise_for_status()
+            return r.json()
