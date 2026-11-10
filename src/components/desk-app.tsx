@@ -88,7 +88,7 @@ export function DeskApp() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper text-ink">
+    <div className="flex h-dvh flex-col bg-paper text-ink">
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
@@ -117,9 +117,9 @@ export function DeskApp() {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-6xl flex-1 gap-6 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="mx-auto grid w-full max-w-6xl min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="flex min-h-0 flex-col">
-          <div ref={threadRef} className="flex flex-1 flex-col gap-5 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto">
+          <div ref={threadRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
             {turns.length === 0 ? (
               <div className="flex flex-col gap-5">
                 <h1 className="max-w-xl font-display text-4xl leading-tight font-medium sm:text-5xl">
@@ -225,7 +225,7 @@ export function DeskApp() {
             )}
           </div>
 
-          <form onSubmit={onSubmit} className="sticky bottom-20 z-10 mt-4 flex gap-2 bg-paper py-3 lg:bottom-0">
+          <form onSubmit={onSubmit} className="flex gap-2 border-t border-line bg-paper px-4 py-3">
             <label className="sr-only" htmlFor="ask">
               Ask Cartling
             </label>
@@ -233,28 +233,27 @@ export function DeskApp() {
               id="ask"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Earbuds under 80, a cable in 3 days, or refund the last order"
-              className="min-h-12 flex-1 rounded-xl border border-line bg-sheet px-4 text-base"
+              placeholder="Earbuds under 80, or a cable in 3 days"
+              className="min-h-12 min-w-0 flex-1 rounded-xl border border-line bg-sheet px-4 text-base"
             />
-            <button type="submit" className="min-h-12 rounded-xl bg-ink px-5 font-medium text-on-brass">
+            <button type="submit" className="min-h-12 shrink-0 rounded-xl bg-ink px-5 font-medium text-on-brass">
               Send
             </button>
           </form>
+          <div className="border-t border-line bg-sheet px-4 py-3 lg:hidden">
+            <button type="button" className="flex min-h-12 w-full items-center justify-between" onClick={() => setCartOpen(true)}>
+              <span className="inline-flex items-center gap-2 font-medium">
+                <ShoppingBag className="size-4" aria-hidden="true" />
+                Cart
+              </span>
+              <span className="tabular-nums">{money(total)}</span>
+            </button>
+          </div>
         </section>
 
-        <aside className="hidden lg:block">
-          <div className="sticky top-5 rounded-card border border-line bg-sheet p-4">{cart}</div>
+        <aside className="hidden min-h-0 overflow-y-auto border-l border-line lg:block">
+          <div className="p-4">{cart}</div>
         </aside>
-      </div>
-
-      <div className="sticky bottom-0 z-20 border-t border-line bg-sheet p-3 lg:hidden">
-        <button type="button" className="flex min-h-12 w-full items-center justify-between px-2" onClick={() => setCartOpen(true)}>
-          <span className="inline-flex items-center gap-2 font-medium">
-            <ShoppingBag className="size-4" aria-hidden="true" />
-            Cart
-          </span>
-          <span className="tabular-nums">{money(total)}</span>
-        </button>
       </div>
 
       {cartOpen ? (
