@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Mouse">
+  <rect width="160" height="160" fill="#e7e1d6"/>
+  <g fill="none" stroke="#1a1714" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M58 40h44c8 0 14 10 14 28v24c0 16-10 28-22 28h-28c-12 0-22-12-22-28V68c0-18 6-28 14-28z"/>
+    <path d="M80 40v28"/>
+  </g>
+</svg>

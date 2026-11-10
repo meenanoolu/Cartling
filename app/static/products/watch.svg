@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Watch">
+  <rect width="160" height="160" fill="#e7e1d6"/>
+  <g fill="none" stroke="#1a1714" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M70 28h20v18H70z M70 114h20v18H70z"/>
+    <path d="M56 46h48v68H56z"/>
+  </g>
+</svg>

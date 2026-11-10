@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Cartling">
+  <rect width="32" height="32" rx="6" fill="#EBE6DC"/>
+  <path d="M8.5 13.2h15v12.4a1.6 1.6 0 0 1-1.6 1.6H10.1a1.6 1.6 0 0 1-1.6-1.6z" fill="#1A1714"/>
+  <path d="M12.2 13.2V10.8a3.8 3.8 0 0 1 7.6 0v2.4" fill="none" stroke="#8C6239" stroke-width="2.1" stroke-linecap="round"/>
+</svg>
