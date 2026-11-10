@@ -3,55 +3,142 @@
 <head>
   <meta charset="UTF-8">
   <title>Cartling</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; background: #0f172a; color: #e2e8f0; }
-    #chat { border: 1px solid #334155; height: 480px; overflow-y: auto; padding: 16px; border-radius: 12px; background: #1e293b; }
-    .msg { margin: 10px 0; padding: 10px 14px; border-radius: 10px; }
-    .user { background: #3b82f6; margin-left: 20%; }
-    .bot { background: #334155; margin-right: 20%; }
-    #input { display: flex; margin-top: 12px; }
-    input { flex: 1; padding: 12px; border-radius: 8px; border: none; background: #1e293b; color: white; }
-    button { margin-left: 8px; padding: 12px 20px; background: #22c55e; border: none; border-radius: 8px; color: white; cursor: pointer; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; height: 100vh; color: #0f172a; }
+    .top { height: 56px; background: #0f172a; color: white; display: flex; align-items: center; padding: 0 24px; font-weight: 600; font-size: 1.1rem; }
+    .app { display: flex; height: calc(100vh - 56px); max-width: 1400px; margin: 0 auto; }
+    .sidebar { width: 260px; background: #0f172a; color: #cbd5e1; padding: 20px; display: flex; flex-direction: column; border-right: 1px solid #1e293b; }
+    .sidebar h2 { font-size: 0.95rem; margin-bottom: 16px; color: #94a3b8; font-weight: 500; }
+    .new-chat { background: #1e293b; border: none; color: white; padding: 10px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 16px; text-align: left; }
+    .new-chat:hover { background: #334155; }
+    .history { flex: 1; overflow-y: auto; }
+    .history-item { padding: 8px 10px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-item:hover, .history-item.active { background: #1e293b; }
+    .main { flex: 1; display: flex; flex-direction: column; background: white; }
+    #chat { flex: 1; overflow-y: auto; padding: 32px; display: flex; flex-direction: column; gap: 16px; }
+    .msg { max-width: 72%; padding: 12px 16px; border-radius: 14px; line-height: 1.5; }
+    .user { align-self: flex-end; background: #0ea5e9; color: white; }
+    .bot { align-self: flex-start; background: #f1f5f9; border: 1px solid #e2e8f0; }
+    .bot strong { font-weight: 600; }
+    .bot a { color: #0ea5e9; }
+    .input-area { padding: 16px 32px 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; background: white; }
+    input { flex: 1; padding: 12px 16px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 1rem; }
+    input:focus { outline: none; border-color: #0ea5e9; }
+    button.send { padding: 12px 20px; background: #0ea5e9; border: none; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; }
+    .typing { color: #64748b; font-style: italic; align-self: flex-start; }
   </style>
 </head>
 <body>
-  <h1>Cartling</h1>
-  <div id="chat"></div>
-  <div id="input">
-    <input id="msg" placeholder="Describe what you want or say yes buy..." autofocus>
-    <button onclick="send()">Send</button>
+  <div class="top">Cartling</div>
+  <div class="app">
+    <div class="sidebar">
+      <button class="new-chat" onclick="newChat()">+ New chat</button>
+      <h2>History</h2>
+      <div class="history" id="history"></div>
+    </div>
+    <div class="main">
+      <div id="chat"></div>
+      <div class="input-area">
+        <input id="msg" placeholder="What are you looking for?" autofocus>
+        <button class="send" onclick="send()">Send</button>
+      </div>
+    </div>
   </div>
   <script>
-    const chat = document.getElementById("chat");
+    const chatEl = document.getElementById("chat");
     const input = document.getElementById("msg");
+    const historyEl = document.getElementById("history");
     let history = [];
+    let chats = JSON.parse(localStorage.getItem("cartling_chats") || "[]");
+    let currentChatId = null;
 
-    function addMsg(text, cls) {
+    function saveChats() {
+      localStorage.setItem("cartling_chats", JSON.stringify(chats));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      historyEl.innerHTML = "";
+      chats.slice().reverse().forEach(c => {
+        const div = document.createElement("div");
+        div.className = "history-item" + (c.id === currentChatId ? " active" : "");
+        div.textContent = c.title || "New chat";
+        div.onclick = () => loadChat(c.id);
+        historyEl.appendChild(div);
+      });
+    }
+
+    function newChat() {
+      currentChatId = Date.now().toString();
+      history = [];
+      chatEl.innerHTML = "";
+      addMsg("Hi, I'm Cartling. Tell me what you want and your budget.", "bot");
+      chats.push({ id: currentChatId, title: "New chat", messages: [] });
+      saveChats();
+    }
+
+    function loadChat(id) {
+      const c = chats.find(x => x.id === id);
+      if (!c) return;
+      currentChatId = id;
+      history = c.messages || [];
+      chatEl.innerHTML = "";
+      history.forEach(m => addMsg(m.content, m.role === "user" ? "user" : "bot", false));
+      renderHistory();
+    }
+
+    function addMsg(text, cls, save = true) {
       const div = document.createElement("div");
       div.className = "msg " + cls;
-      div.innerText = text;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
+      div.innerHTML = cls === "bot" ? marked.parse(text) : text;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      if (save && currentChatId) {
+        const c = chats.find(x => x.id === currentChatId);
+        if (c) {
+          if (cls === "user" && c.title === "New chat") c.title = text.slice(0, 36);
+          c.messages = history;
+          saveChats();
+        }
+      }
+      return div;
     }
 
     async function send() {
       const text = input.value.trim();
       if (!text) return;
+      if (!currentChatId) newChat();
       addMsg(text, "user");
       input.value = "";
       history.push({ role: "user", content: text });
 
-      const res = await fetch("/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history })
-      });
-      const data = await res.json();
-      addMsg(data.reply, "bot");
-      history.push({ role: "assistant", content: data.reply });
+      const typing = addMsg("Thinking...", "typing", false);
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, history })
+        });
+        const data = await res.json();
+        typing.remove();
+        addMsg(data.reply, "bot");
+        history.push({ role: "assistant", content: data.reply });
+        const c = chats.find(x => x.id === currentChatId);
+        if (c) { c.messages = history; saveChats(); }
+      } catch {
+        typing.remove();
+        addMsg("Something went wrong.", "bot");
+      }
     }
 
     input.addEventListener("keypress", e => { if (e.key === "Enter") send(); });
+    if (chats.length) loadChat(chats[chats.length - 1].id);
+    else newChat();
+    renderHistory();
   </script>
 </body>
 </html>
