@@ -13,12 +13,22 @@ type DeskState = {
   focusStore: string | null;
   setReady: (ready: boolean) => void;
   setBudget: (budget: number) => void;
-  send: (text: string, display?: string) => { polish: boolean; brief: string; turnId: string | null };
-  replaceTurn: (id: string, text: string) => void;
+  send: (text: string, display?: string) => {
+    polish: boolean;
+    brief: string;
+    turnId: string | null;
+    webQuery?: string;
+    recommendId?: string;
+    stores?: Record<string, string>;
+    paypalRefundId?: string;
+  };
+  replaceTurn: (id: string, text: string, patch?: Partial<Turn>) => void;
   setQty: (productId: string, qty: number) => void;
   setStore: (productId: string, store: string) => boolean;
   pay: () => string | null;
-  refund: (id: string) => void;
+  note: (text: string) => void;
+  recordPaid: (order: Order, clearCart: boolean) => void;
+  refund: (id: string, quiet?: boolean) => void;
 };
 
 export const useDesk = create<DeskState>()(
@@ -51,6 +61,22 @@ export const useDesk = create<DeskState>()(
           stores: result.stores,
           actions: result.actions,
         });
+        const paypalRefund = (result.orders ?? []).find((order) => {
+          const prev = desk.orders.find((row) => row.id === order.id);
+          return order.status === "refunded" && prev?.status === "paid" && Boolean(prev.paypalOrderId);
+        });
+        if (paypalRefund) {
+          const pending = newTurn("cartling", `Sending ${paypalRefund.id} back through PayPal.`);
+          set({
+            turns: [...desk.turns, newTurn("you", display?.trim() || clean), pending].slice(-40),
+          });
+          return {
+            polish: false,
+            brief: "",
+            turnId: pending.id,
+            paypalRefundId: paypalRefund.id,
+          };
+        }
         set({
           budget: result.budget ?? desk.budget,
           lines: result.lines ?? desk.lines,
@@ -59,11 +85,18 @@ export const useDesk = create<DeskState>()(
           focusStore: result.focusStore === undefined ? desk.focusStore : result.focusStore,
           turns: [...desk.turns, newTurn("you", display?.trim() || clean), reply].slice(-40),
         });
-        return { polish: result.polish, brief: result.say, turnId: reply.id };
+        return {
+          polish: result.polish,
+          brief: result.say,
+          turnId: reply.id,
+          webQuery: result.webQuery,
+          recommendId: result.recommendId,
+          stores: result.stores,
+        };
       },
-      replaceTurn: (id, text) =>
+      replaceTurn: (id, text, patch) =>
         set({
-          turns: get().turns.map((turn) => (turn.id === id ? { ...turn, text } : turn)),
+          turns: get().turns.map((turn) => (turn.id === id ? { ...turn, ...patch, text } : turn)),
         }),
       setQty: (productId, qty) => {
         const current = get().lines;
@@ -101,12 +134,27 @@ export const useDesk = create<DeskState>()(
         });
         return order.id;
       },
-      refund: (id) => {
+      note: (text) => set({ turns: [...get().turns, newTurn("cartling", text)].slice(-40) }),
+      recordPaid: (order, clearCart) => {
+        const stores = [...new Set(order.lines.map((line) => line.store))];
+        const packs = `${stores.length} package${stores.length === 1 ? "" : "s"}: ${stores.join(", ")}`;
+        set({
+          lines: clearCart ? [] : get().lines,
+          orders: [...get().orders.filter((row) => row.id !== order.id), order],
+          turns: [
+            ...get().turns,
+            newTurn("cartling", `Paid ${order.id} for ${money(order.total)} through PayPal. ${packs}. Refund sends it back through PayPal.`),
+          ].slice(-40),
+        });
+      },
+      refund: (id, quiet) => {
         const order = get().orders.find((row) => row.id === id && row.status === "paid");
         if (!order) return;
         set({
           orders: get().orders.map((row) => (row.id === id ? { ...row, status: "refunded" as const } : row)),
-          turns: [...get().turns, newTurn("cartling", `Refunded ${id}. ${money(order.total)} is released.`)].slice(-40),
+          turns: quiet
+            ? get().turns
+            : [...get().turns, newTurn("cartling", `Refunded ${id}${order.paypalOrderId ? " through PayPal" : ""}. ${money(order.total)} is released.`)].slice(-40),
         });
       },
     }),

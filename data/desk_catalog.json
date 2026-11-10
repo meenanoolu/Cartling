@@ -1,0 +1,64 @@
+[
+  {
+    "id": "earbuds-nc",
+    "name": "Noise-cancelling earbuds",
+    "offers": [
+      { "store": "BudgetBuy", "price": 69.99, "ships": "4 days", "days": 4 },
+      { "store": "GadgetHub", "price": 74.5, "ships": "2 days", "days": 2 },
+      { "store": "TechStore", "price": 79.99, "ships": "2 days", "days": 2 }
+    ]
+  },
+  {
+    "id": "headphones-overear",
+    "name": "Over-ear headphones",
+    "offers": [
+      { "store": "GadgetHub", "price": 119, "ships": "3 days", "days": 3 },
+      { "store": "TechStore", "price": 129.99, "ships": "2 days", "days": 2 }
+    ]
+  },
+  {
+    "id": "phone-case",
+    "name": "Clear shockproof case",
+    "offers": [
+      { "store": "GadgetHub", "price": 12.5, "ships": "3 days", "days": 3 },
+      { "store": "TechStore", "price": 14.99, "ships": "2 days", "days": 2 }
+    ]
+  },
+  {
+    "id": "usb-c-cable",
+    "name": "USB-C cable, 2m",
+    "offers": [
+      { "store": "BudgetBuy", "price": 9.99, "ships": "5 days", "days": 5 },
+      { "store": "TechStore", "price": 12.99, "ships": "2 days", "days": 2 }
+    ]
+  },
+  {
+    "id": "power-bank",
+    "name": "20000mAh power bank",
+    "offers": [
+      { "store": "BudgetBuy", "price": 29.99, "ships": "4 days", "days": 4 },
+      { "store": "GadgetHub", "price": 34.99, "ships": "2 days", "days": 2 }
+    ]
+  },
+  {
+    "id": "smartwatch",
+    "name": "Fitness smartwatch",
+    "offers": [
+      { "store": "GadgetHub", "price": 79.99, "ships": "3 days", "days": 3 },
+      { "store": "TechStore", "price": 89.99, "ships": "2 days", "days": 2 }
+    ]
+  },
+  {
+    "id": "laptop-stand",
+    "name": "Adjustable laptop stand",
+    "offers": [{ "store": "BudgetBuy", "price": 24.99, "ships": "4 days", "days": 4 }]
+  },
+  {
+    "id": "mouse",
+    "name": "Wireless ergonomic mouse",
+    "offers": [
+      { "store": "GadgetHub", "price": 24.5, "ships": "3 days", "days": 3 },
+      { "store": "TechStore", "price": 29.99, "ships": "2 days", "days": 2 }
+    ]
+  }
+]

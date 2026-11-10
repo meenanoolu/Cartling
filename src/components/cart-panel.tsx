@@ -11,6 +11,7 @@ export function CartPanel({
   onPay,
   onRefund,
   showHeading = true,
+  paying = false,
 }: {
   budget: number;
   lines: CartLine[];
@@ -20,6 +21,7 @@ export function CartPanel({
   onPay: () => void;
   onRefund: (id: string) => void;
   showHeading?: boolean;
+  paying?: boolean;
 }) {
   const total = cartTotal(lines);
   const over = total > budget + 0.001;
@@ -132,14 +134,14 @@ export function CartPanel({
         )}
         <button
           type="button"
-          disabled={lines.length === 0 || over}
+          disabled={lines.length === 0 || over || paying}
           onClick={onPay}
           className="min-h-11 rounded-xl bg-brass px-4 py-3 font-medium text-on-brass disabled:opacity-40"
         >
-          {lines.length === 0 ? "Nothing to pay" : `Pay ${money(total)}`}
+          {paying ? "Opening PayPal" : lines.length === 0 ? "Nothing to pay" : `Pay ${money(total)} with PayPal`}
         </button>
         <p className="text-sm leading-relaxed text-muted">
-          A receipt on this device, priced at the store you picked. The full checkout charges through PayPal when the project keys are set.
+          PayPal sandbox charges this exact total. The server prices every line. A refund goes back through PayPal.
         </p>
       </section>
       <section className="flex flex-col gap-3">

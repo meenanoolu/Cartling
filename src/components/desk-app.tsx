@@ -6,6 +6,8 @@ import { polishReply } from "@/lib/voice";
 import { useDesk } from "@/lib/use-desk";
 import { ProductCard } from "@/components/product-card";
 import { CartPanel } from "@/components/cart-panel";
+import { WebCard } from "@/components/web-card";
+import { adviseStore, capturePaypal, refundPaypal, searchWeb, serviceHealth, startCheckout, type WebHit } from "@/lib/paypal";
 
 const STARTERS = [
   { label: "Earbuds under $80", run: "Noise-cancelling earbuds under 80" },
@@ -25,13 +27,18 @@ export function DeskApp() {
   const replaceTurn = useDesk((s) => s.replaceTurn);
   const setQty = useDesk((s) => s.setQty);
   const setStore = useDesk((s) => s.setStore);
-  const pay = useDesk((s) => s.pay);
+  const note = useDesk((s) => s.note);
+  const recordPaid = useDesk((s) => s.recordPaid);
   const refund = useDesk((s) => s.refund);
   const setReady = useDesk((s) => s.setReady);
   const [draft, setDraft] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [aisle, setAisle] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [webHits, setWebHits] = useState<WebHit[]>([]);
+  const [webTurn, setWebTurn] = useState<string | null>(null);
+  const [health, setHealth] = useState<{ paypal: boolean; grok: boolean; channel3: boolean } | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const total = cartTotal(lines);
   const owned = new Set(
@@ -40,8 +47,31 @@ export function DeskApp() {
   const inCart = new Set(lines.map((line) => line.productId));
 
   useEffect(() => {
-    void Promise.resolve(useDesk.persist.rehydrate()).finally(() => setReady(true));
-  }, [setReady]);
+    let cancel = false;
+    void Promise.resolve(useDesk.persist.rehydrate()).finally(async () => {
+      setReady(true);
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+      if (params.get("paypal") === "cancel") {
+        window.history.replaceState({}, "", "/");
+        note("PayPal checkout was cancelled. The cart is still here.");
+        return;
+      }
+      if (params.get("paypal") === "return" && token) {
+        window.history.replaceState({}, "", "/");
+        const captured = await capturePaypal(token);
+        if (cancel) return;
+        if (captured.ok && captured.order) recordPaid(captured.order, Boolean(captured.clearCart));
+        else note(captured.error || "PayPal did not capture that order.");
+      }
+    });
+    void serviceHealth().then((next) => {
+      if (!cancel) setHealth(next);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [note, recordPaid, setReady]);
 
   useEffect(() => {
     const node = threadRef.current;
@@ -53,16 +83,96 @@ export function DeskApp() {
     const result = send(text, display);
     setDraft("");
     setAisle(false);
+    setWebHits([]);
+    setWebTurn(null);
+    if (result.paypalRefundId && result.turnId) {
+      setBusy("Sending that back through PayPal");
+      const refunded = await refundPaypal(result.paypalRefundId);
+      if (refunded.ok) {
+        refund(result.paypalRefundId, true);
+        replaceTurn(result.turnId, `Refunded ${result.paypalRefundId} through PayPal.`);
+      } else replaceTurn(result.turnId, refunded.error || "PayPal did not refund that.");
+      setBusy(null);
+      return;
+    }
+    if (result.webQuery && result.turnId) {
+      setBusy("Asking Channel3");
+      const found = await searchWeb(result.webQuery, useDesk.getState().budget);
+      if (found.ok && found.results.length) {
+        replaceTurn(result.turnId, "Channel3 found these. PayPal charges the price on the card.");
+        setWebHits(found.results);
+        setWebTurn(result.turnId);
+      } else replaceTurn(result.turnId, found.error || "Channel3 had nothing under that ceiling.");
+      setBusy(null);
+      return;
+    }
     if (!result.polish || !result.turnId) return;
-    setBusy(true);
+    setBusy("Asking Grok");
     try {
+      if (result.recommendId) {
+        const advice = await adviseStore({ productId: result.recommendId, brief: result.brief, ask: text });
+        if (advice.ok && advice.text && advice.store) {
+          const previous = result.stores?.[result.recommendId];
+          const turn = useDesk.getState().turns.find((row) => row.id === result.turnId);
+          replaceTurn(result.turnId, advice.text, {
+            recommendStore: advice.store,
+            stores: { ...result.stores, [result.recommendId]: advice.store },
+            actions: turn?.actions?.map((action) =>
+              previous && action.run === `add ${result.recommendId} from ${previous}`
+                ? { ...action, run: `add ${result.recommendId} from ${advice.store}` }
+                : action,
+            ),
+          });
+          return;
+        }
+      }
       const polished = await polishReply({ data: { brief: result.brief } });
       if (polished.ok && polished.text) replaceTurn(result.turnId, polished.text);
     } catch {
       /* the desk note already stands */
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
+  }
+
+  async function checkout() {
+    setPaying(true);
+    const state = useDesk.getState();
+    const opened = await startCheckout({
+      lines: state.lines.map((line) => ({ productId: line.productId, qty: line.qty, store: line.store })),
+      budget: state.budget,
+    });
+    if (opened.approveUrl) {
+      window.location.href = opened.approveUrl;
+      return;
+    }
+    setPaying(false);
+    note(opened.error || "PayPal did not open.");
+  }
+
+  async function payWeb(id: string) {
+    setPaying(true);
+    const opened = await startCheckout({ webId: id, budget: useDesk.getState().budget });
+    if (opened.approveUrl) {
+      window.location.href = opened.approveUrl;
+      return;
+    }
+    setPaying(false);
+    note(opened.error || "PayPal did not open.");
+  }
+
+  async function refundOrder(id: string) {
+    const order = useDesk.getState().orders.find((row) => row.id === id);
+    if (order?.paypalOrderId) {
+      setBusy("Sending that back through PayPal");
+      const refunded = await refundPaypal(order.paypalOrderId);
+      setBusy(null);
+      if (!refunded.ok) {
+        note(refunded.error || "PayPal did not refund that.");
+        return;
+      }
+    }
+    refund(id);
   }
 
   function onSubmit(event: FormEvent) {
@@ -80,10 +190,12 @@ export function DeskApp() {
       onQty={setQty}
       onStore={setStore}
       onPay={() => {
-        pay();
-        setCartOpen(false);
+        void checkout();
       }}
-      onRefund={refund}
+      onRefund={(id) => {
+        void refundOrder(id);
+      }}
+      paying={paying}
     />
   );
 
@@ -97,7 +209,10 @@ export function DeskApp() {
             </span>
             <div>
               <p className="font-display text-2xl leading-none font-medium">Cartling</p>
-              <p className="mt-1 hidden text-sm text-muted sm:block">Cheap or fast, decided before you pay.</p>
+              <p className="mt-1 hidden text-sm text-muted sm:block">
+                {health?.paypal ? "PayPal sandbox is connected" : "Cheap or fast, decided before you pay."}
+                {health?.grok ? " - Grok picks the store" : ""}
+              </p>
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm">
@@ -189,10 +304,17 @@ export function DeskApp() {
                       })}
                     </div>
                   ) : null}
+                  {turn.id === webTurn ? (
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      {webHits.map((hit) => (
+                        <WebCard key={hit.id} hit={hit} onPay={(id) => void payWeb(id)} />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
-            {busy ? <p className="text-sm text-muted">Rewriting that more cleanly…</p> : null}
+            {busy ? <p className="text-sm text-muted">{busy}...</p> : null}
 
             {aisle ? (
               <div className="flex flex-col gap-3">
@@ -273,10 +395,12 @@ export function DeskApp() {
               onStore={setStore}
               showHeading={false}
               onPay={() => {
-                pay();
-                setCartOpen(false);
+                void checkout();
               }}
-              onRefund={refund}
+              onRefund={(id) => {
+                void refundOrder(id);
+              }}
+              paying={paying}
             />
           </div>
         </div>

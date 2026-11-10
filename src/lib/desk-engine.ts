@@ -26,6 +26,8 @@ export type Order = {
   lines: OrderLine[];
   total: number;
   status: "paid" | "refunded";
+  paypalOrderId?: string;
+  paypalCaptureId?: string;
 };
 
 export type TurnAction = { label: string; run: string };
@@ -62,6 +64,7 @@ export type EngineResult = {
   focusId?: string | null;
   focusStore?: string | null;
   polish: boolean;
+  webQuery?: string;
 };
 
 const SETS: { test: RegExp; ids: string[]; name: string }[] = [
@@ -332,7 +335,7 @@ export function interpret(raw: string, desk: DeskSnapshot): EngineResult {
     };
   }
 
-  if (/\b(checkout|check out|pay now|place the order|i(?:'|\u2019)ll take it)\b/.test(text)) {
+  if (/\b(checkout|check out|pay now|place the order|i(?:'|’)ll take it)\b/.test(text)) {
     if (desk.lines.length === 0) return { say: "Nothing to pay for yet.", polish: false };
     if (!within(desk.lines, desk.budget)) {
       return {
@@ -471,6 +474,20 @@ export function interpret(raw: string, desk: DeskSnapshot): EngineResult {
   }
 
   if (explicit.length === 0) {
+    const leftover = text
+      .replace(/\b(under|below|max(?:imum)?|budget|ceiling|less than|within|up to|only|dollars?)\b/g, " ")
+      .replace(/\$?\d+(?:\.\d{1,2})?/g, " ")
+      .replace(/\b(the|a|an|for|me|please|show|find|need|want|i|some|something)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (leftover.length >= 3) {
+      return {
+        say: "Nothing in the aisle matches that. Asking Channel3.",
+        webQuery: raw.trim(),
+        budget: stated ?? undefined,
+        polish: false,
+      };
+    }
     if (stated) {
       return {
         say: `Ceiling is ${money(stated)}. Tell me the job — earbuds, a desk, a cable — and I will only show what fits.`,
