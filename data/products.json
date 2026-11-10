@@ -1,8 +1,8 @@
 [
   {
-    "id": "earbuds-1",
+    "id": "earbuds-nc",
     "name": "Noise-Cancelling Earbuds",
-    "description": "Active noise cancelling, 30h battery",
+    "description": "Active noise cancelling wireless earbuds, 30h battery",
     "stores": [
       {"store": "TechStore", "price": 79.99},
       {"store": "GadgetHub", "price": 74.50},
@@ -10,12 +10,65 @@
     ]
   },
   {
-    "id": "case-1",
-    "name": "Clear Phone Case",
-    "description": "Shockproof clear case",
+    "id": "headphones-overear",
+    "name": "Over-Ear Wireless Headphones",
+    "description": "Comfortable over-ear headphones with 40h battery",
+    "stores": [
+      {"store": "TechStore", "price": 129.99},
+      {"store": "GadgetHub", "price": 119.00}
+    ]
+  },
+  {
+    "id": "phone-case",
+    "name": "Clear Shockproof Phone Case",
+    "description": "Slim clear case with raised edges",
     "stores": [
       {"store": "TechStore", "price": 14.99},
       {"store": "GadgetHub", "price": 12.50}
+    ]
+  },
+  {
+    "id": "usb-c-cable",
+    "name": "USB-C Charging Cable 2m",
+    "description": "Fast charging braided cable",
+    "stores": [
+      {"store": "BudgetBuy", "price": 9.99},
+      {"store": "TechStore", "price": 12.99}
+    ]
+  },
+  {
+    "id": "power-bank",
+    "name": "20000mAh Power Bank",
+    "description": "High capacity portable charger",
+    "stores": [
+      {"store": "GadgetHub", "price": 34.99},
+      {"store": "BudgetBuy", "price": 29.99}
+    ]
+  },
+  {
+    "id": "smartwatch",
+    "name": "Fitness Smartwatch",
+    "description": "Heart rate, sleep tracking, 7 day battery",
+    "stores": [
+      {"store": "TechStore", "price": 89.99},
+      {"store": "GadgetHub", "price": 79.99}
+    ]
+  },
+  {
+    "id": "laptop-stand",
+    "name": "Adjustable Laptop Stand",
+    "description": "Aluminum stand for better posture",
+    "stores": [
+      {"store": "BudgetBuy", "price": 24.99}
+    ]
+  },
+  {
+    "id": "mouse",
+    "name": "Wireless Ergonomic Mouse",
+    "description": "Silent click ergonomic mouse",
+    "stores": [
+      {"store": "TechStore", "price": 29.99},
+      {"store": "GadgetHub", "price": 24.50}
     ]
   }
 ]
