@@ -1,51 +1,60 @@
-import json
-from pathlib import Path
+import os
+import httpx
+from dotenv import load_dotenv
 
-CATALOG_PATH = Path(__file__).parent.parent / "data" / "products.json"
+load_dotenv()
 
-def load_catalog():
-    with open(CATALOG_PATH) as f:
-        return json.load(f)
+CHANNEL3_KEY = os.getenv("CHANNEL3_API_KEY")
+CHANNEL3_URL = "https://api.trychannel3.com/v1/search"
 
-def search_and_compare(query: str, max_price: float) -> dict:
-    products = load_catalog()
+async def search_and_compare(query: str, max_price: float) -> dict:
+    if not CHANNEL3_KEY:
+        return {"error": "CHANNEL3_API_KEY not set", "results": []}
+
+    payload = {
+        "query": query,
+        "filters": {
+            "price": {"max_price": max_price}
+        },
+        "limit": 8
+    }
+
+    async with httpx.AsyncClient() as client:
+        r = await client.post(
+            CHANNEL3_URL,
+            headers={
+                "x-api-key": CHANNEL3_KEY,
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=30.0
+        )
+        r.raise_for_status()
+        data = r.json()
+
     results = []
-    query_words = query.lower().replace("-", " ").split()
-    
-    for p in products:
-        name_desc = (p["name"] + " " + p["description"]).lower().replace("-", " ")
-        # Match if any important word from the query appears
-        if any(word in name_desc for word in query_words if len(word) > 3):
-            cheapest = min(p["stores"], key=lambda s: s["price"])
-            if cheapest["price"] <= max_price:
-                results.append({
-                    "id": p["id"],
-                    "name": p["name"],
-                    "description": p["description"],
-                    "best_price": cheapest["price"],
-                    "best_store": cheapest["store"],
-                    "all_stores": p["stores"]
-                })
+    for p in data.get("products", []):
+        offers = p.get("offers", [])
+        if not offers:
+            continue
+        best = min(offers, key=lambda o: o.get("price", 999999))
+        results.append({
+            "id": p.get("id") or p.get("title", "")[:40],
+            "name": p.get("title", "Unknown"),
+            "description": p.get("description", "")[:200],
+            "best_price": best.get("price"),
+            "best_store": best.get("merchant") or best.get("retailer") or "Unknown",
+            "all_stores": [
+                {"store": o.get("merchant") or o.get("retailer"), "price": o.get("price")}
+                for o in offers[:5]
+            ],
+            "image": p.get("image") or (p.get("images") or [None])[0],
+            "buy_url": best.get("url")
+        })
+
     return {"results": results, "query": query, "max_price": max_price}
 
+
 def build_cart(item_ids: list, budget: float) -> dict:
-    products = load_catalog()
-    cart = []
-    total = 0.0
-    for pid in item_ids:
-        product = next((p for p in products if p["id"] == pid), None)
-        if product:
-            cheapest = min(product["stores"], key=lambda s: s["price"])
-            cart.append({
-                "id": product["id"],
-                "name": product["name"],
-                "price": cheapest["price"],
-                "store": cheapest["store"]
-            })
-            total += cheapest["price"]
-    return {
-        "items": cart,
-        "total": round(total, 2),
-        "budget": budget,
-        "within_budget": total <= budget
-    }
+    # Kept for compatibility; Channel3 flow mainly uses search results
+    return {"items": [], "total": 0, "budget": budget, "within_budget": True, "note": "Use search results directly"}

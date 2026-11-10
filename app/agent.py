@@ -16,8 +16,8 @@ from app.order_store import get_order, save_order, update_tracking
 
 paypal = PayPalClient()
 
-def tool_search_and_compare(query: str, max_price: float) -> dict:
-    return search_and_compare(query, max_price)
+async def tool_search_and_compare(query: str, max_price: float) -> dict:
+    return await search_and_compare(query, max_price)
 
 def tool_build_cart(item_ids: list, budget: float) -> dict:
     return build_cart(item_ids, budget)
@@ -179,7 +179,7 @@ async def run_agent(user_message: str, history: list = None) -> str:
                 result = {"error": f"Unknown tool {fn_name}"}
             else:
                 func = TOOL_MAP[fn_name]
-                if fn_name in ("create_paypal_order", "get_order_status", "refund_order"):
+                if fn_name in ("search_and_compare", "create_paypal_order", "get_order_status", "refund_order"):
                     result = await func(**args)
                 else:
                     result = func(**args)
