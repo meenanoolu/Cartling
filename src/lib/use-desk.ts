@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { money, productById } from "./catalog";
-import { buildOrder, cartTotal, interpret, newTurn, type CartLine, type Order, type Turn } from "./desk-engine";
+import { buildOrder, cartTotal, interpret, newTurn, type CartLine, type Order, type ShipTo, type Turn } from "./desk-engine";
 
 export type Chat = {
   id: string;
@@ -20,8 +20,10 @@ type DeskState = {
   activeId: string;
   focusId: string | null;
   focusStore: string | null;
+  shipTo: ShipTo | null;
   setReady: (ready: boolean) => void;
   setBudget: (budget: number) => void;
+  setShipTo: (shipTo: ShipTo) => void;
   ensureChats: () => void;
   newChat: () => void;
   openChat: (id: string) => void;
@@ -33,6 +35,7 @@ type DeskState = {
     recommendId?: string;
     stores?: Record<string, string>;
     paypalRefundId?: string;
+    needAddress?: boolean;
   };
   replaceTurn: (id: string, text: string, patch?: Partial<Turn>) => void;
   setQty: (productId: string, qty: number) => void;
@@ -55,8 +58,10 @@ export const useDesk = create<DeskState>()(
       activeId: "",
       focusId: null,
       focusStore: null,
+      shipTo: null,
       setReady: (ready) => set({ ready }),
       setBudget: (budget) => set({ budget: clampBudget(budget) }),
+      setShipTo: (shipTo) => set({ shipTo }),
       ensureChats: () => {
         const desk = get();
         if (desk.activeId && desk.chats.some((chat) => chat.id === desk.activeId)) return;
@@ -97,7 +102,11 @@ export const useDesk = create<DeskState>()(
           orders: desk.orders,
           focusId: desk.focusId,
           focusStore: desk.focusStore,
+          shipTo: desk.shipTo,
         });
+        if (desk.shipTo && !result.needAddress && namesADay(clean)) {
+          result.say = `Shipping to ${desk.shipTo.city}, ${desk.shipTo.postal}. ${result.say}`;
+        }
         const reply = newTurn("cartling", result.say, {
           productIds: result.products,
           recommendId: result.recommendId,
@@ -136,6 +145,7 @@ export const useDesk = create<DeskState>()(
           webQuery: result.webQuery,
           recommendId: result.recommendId,
           stores: result.stores,
+          needAddress: result.needAddress,
         };
       },
       replaceTurn: (id, text, patch) => {
@@ -222,6 +232,7 @@ export const useDesk = create<DeskState>()(
         activeId: state.activeId,
         focusId: state.focusId,
         focusStore: state.focusStore,
+        shipTo: state.shipTo,
       }),
     },
   ),
@@ -243,6 +254,12 @@ function saved(desk: { chats: Chat[]; activeId: string; turns: Turn[] }, turns: 
   const rest = desk.chats.filter((row) => row.id !== id);
   const chats = turns.length ? [chat, ...rest].slice(0, 30) : rest;
   return { activeId: id, turns, chats };
+}
+
+function namesADay(text: string): boolean {
+  return /\b(?:in|within)\s+\d+\s+days?\b|\bby\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|\b(tomorrow|overnight|this weekend|asap|rush)\b/.test(
+    text.toLowerCase(),
+  );
 }
 
 function clampBudget(value: number): number {

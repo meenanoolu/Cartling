@@ -44,12 +44,22 @@ export type Turn = {
   hits?: { id: string; name: string; price: number; store: string; image: string; blurb: string }[];
 };
 
+export type ShipTo = {
+  name: string;
+  line1: string;
+  city: string;
+  region: string;
+  postal: string;
+  country: string;
+};
+
 export type DeskSnapshot = {
   budget: number;
   lines: CartLine[];
   orders: Order[];
   focusId: string | null;
   focusStore: string | null;
+  shipTo: ShipTo | null;
 };
 
 export type EngineResult = {
@@ -66,6 +76,7 @@ export type EngineResult = {
   focusStore?: string | null;
   polish: boolean;
   webQuery?: string;
+  needAddress?: boolean;
 };
 
 const SETS: { test: RegExp; ids: string[]; name: string }[] = [
@@ -236,6 +247,15 @@ export function interpret(raw: string, desk: DeskSnapshot): EngineResult {
       })
       .join(" ");
     return { say: lines, polish: false };
+  }
+
+  if (/\b(change|update|edit)\s+(my\s+)?address\b|\bship(?:ping)? address\b/.test(text) || (limit != null && !desk.shipTo)) {
+    const where = limit != null ? `A ${limit} day window depends on where this ships. ` : "";
+    return {
+      say: `${where}Add a name, street, city, region and postal code. PayPal ships the next order there. The day count stays the store's handoff, not a doorstep promise.`,
+      needAddress: true,
+      polish: false,
+    };
   }
 
   if (/\b(what(?:'s| is) in (?:my )?cart|show (?:my )?cart)\b/.test(text)) {

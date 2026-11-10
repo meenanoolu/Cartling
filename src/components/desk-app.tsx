@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ShoppingBag, X } from "lucide-react";
 import { PRODUCTS, money, productById } from "@/lib/catalog";
-import { cartTotal } from "@/lib/desk-engine";
+import { cartTotal, type ShipTo } from "@/lib/desk-engine";
 import { polishReply } from "@/lib/voice";
 import { useDesk } from "@/lib/use-desk";
 import { ProductCard } from "@/components/product-card";
@@ -36,12 +36,16 @@ export function DeskApp() {
   const note = useDesk((s) => s.note);
   const recordPaid = useDesk((s) => s.recordPaid);
   const refund = useDesk((s) => s.refund);
+  const shipTo = useDesk((s) => s.shipTo);
+  const setShipTo = useDesk((s) => s.setShipTo);
   const setReady = useDesk((s) => s.setReady);
   const [draft, setDraft] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [aisle, setAisle] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [addressOpen, setAddressOpen] = useState(false);
+  const [pendingAsk, setPendingAsk] = useState<string | null>(null);
   const [health, setHealth] = useState<{ paypal: boolean; grok: boolean; channel3: boolean } | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const total = cartTotal(lines);
@@ -88,6 +92,11 @@ export function DeskApp() {
     const result = send(text, display);
     setDraft("");
     setAisle(false);
+    if (result.needAddress) {
+      setAddressOpen(true);
+      setPendingAsk(text);
+      return;
+    }
     if (result.paypalRefundId && result.turnId) {
       setBusy("Sending that back through PayPal");
       const refunded = await refundPaypal(result.paypalRefundId);
@@ -137,11 +146,17 @@ export function DeskApp() {
   }
 
   async function checkout() {
-    setPaying(true);
     const state = useDesk.getState();
+    if (!state.shipTo) {
+      setAddressOpen(true);
+      note("PayPal needs a ship-to address before it can open.");
+      return;
+    }
+    setPaying(true);
     const opened = await startCheckout({
       lines: state.lines.map((line) => ({ productId: line.productId, qty: line.qty, store: line.store })),
       budget: state.budget,
+      address: state.shipTo,
     });
     if (opened.approveUrl) {
       window.location.href = opened.approveUrl;
@@ -152,8 +167,14 @@ export function DeskApp() {
   }
 
   async function payWeb(id: string) {
+    const state = useDesk.getState();
+    if (!state.shipTo) {
+      setAddressOpen(true);
+      note("PayPal needs a ship-to address before it can open.");
+      return;
+    }
     setPaying(true);
-    const opened = await startCheckout({ webId: id, budget: useDesk.getState().budget });
+    const opened = await startCheckout({ webId: id, budget: state.budget, address: state.shipTo });
     if (opened.approveUrl) {
       window.location.href = opened.approveUrl;
       return;
@@ -239,6 +260,13 @@ export function DeskApp() {
           <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-4 py-2" role="navigation" aria-label="Chats">
             <button type="button" className="min-h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-on-brass" onClick={() => newChat()}>
               New chat
+            </button>
+            <button
+              type="button"
+              className="min-h-11 shrink-0 rounded-full border border-line bg-sheet px-4 text-sm"
+              onClick={() => setAddressOpen((open) => !open)}
+            >
+              {shipTo ? `Ship to ${shipTo.city}` : "Add address"}
             </button>
             {chats.map((chat) => (
               <button
@@ -365,6 +393,19 @@ export function DeskApp() {
             )}
           </div>
 
+          {addressOpen ? (
+            <ShipForm
+              current={shipTo}
+              onSave={(next) => {
+                setShipTo(next);
+                setAddressOpen(false);
+                const ask = pendingAsk;
+                setPendingAsk(null);
+                if (ask) void submit(ask);
+              }}
+            />
+          ) : null}
+
           <form onSubmit={onSubmit} className="relative z-10 flex shrink-0 gap-2 border-t border-line bg-paper px-4 py-3">
             <label className="sr-only" htmlFor="ask">
               Ask Cartling
@@ -424,5 +465,61 @@ export function DeskApp() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ShipForm({ current, onSave }: { current: ShipTo | null; onSave: (next: ShipTo) => void }) {
+  const [name, setName] = useState(current?.name ?? "");
+  const [line1, setLine1] = useState(current?.line1 ?? "");
+  const [city, setCity] = useState(current?.city ?? "");
+  const [region, setRegion] = useState(current?.region ?? "");
+  const [postal, setPostal] = useState(current?.postal ?? "");
+  const [country, setCountry] = useState(current?.country ?? "US");
+
+  function save(event: FormEvent) {
+    event.preventDefault();
+    const next = {
+      name: name.trim(),
+      line1: line1.trim(),
+      city: city.trim(),
+      region: region.trim(),
+      postal: postal.trim(),
+      country: country.trim().toUpperCase(),
+    };
+    if (!next.name || !next.line1 || !next.city || !next.region || next.postal.length < 3 || next.country.length !== 2) return;
+    onSave(next);
+  }
+
+  return (
+    <form onSubmit={save} className="grid shrink-0 gap-3 border-t border-line bg-sheet px-4 py-3 sm:grid-cols-2">
+      <p className="sm:col-span-2 text-sm text-muted">PayPal uses this address. A day count is still the store's handoff time.</p>
+      <label className="flex flex-col gap-1 text-sm">
+        Name
+        <input required autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} className="min-h-11 rounded-xl border border-line bg-paper px-3" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Street
+        <input required autoComplete="address-line1" value={line1} onChange={(event) => setLine1(event.target.value)} className="min-h-11 rounded-xl border border-line bg-paper px-3" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        City
+        <input required autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} className="min-h-11 rounded-xl border border-line bg-paper px-3" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Region
+        <input required autoComplete="address-level1" placeholder="CA" value={region} onChange={(event) => setRegion(event.target.value)} className="min-h-11 rounded-xl border border-line bg-paper px-3" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Postal code
+        <input required autoComplete="postal-code" value={postal} onChange={(event) => setPostal(event.target.value)} className="min-h-11 rounded-xl border border-line bg-paper px-3" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Country
+        <input required autoComplete="country" maxLength={2} value={country} onChange={(event) => setCountry(event.target.value)} className="min-h-11 rounded-xl border border-line bg-paper px-3" />
+      </label>
+      <button type="submit" className="min-h-11 rounded-xl bg-ink px-4 font-medium text-on-brass sm:col-span-2">
+        Save address
+      </button>
+    </form>
   );
 }

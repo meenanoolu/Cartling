@@ -1,4 +1,4 @@
-import type { CartLine, Order, OrderLine } from "@/lib/desk-engine";
+import type { CartLine, Order, OrderLine, ShipTo } from "@/lib/desk-engine";
 
 export type WebHit = {
   id: string;
@@ -25,6 +25,7 @@ export async function startCheckout(body: {
   lines?: Pick<CartLine, "productId" | "qty" | "store">[];
   budget: number;
   webId?: string;
+  address?: ShipTo;
 }): Promise<{ ok: boolean; approveUrl?: string; error?: string }> {
   try {
     const res = await fetch("/api/checkout", {
