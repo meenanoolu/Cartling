@@ -7,7 +7,7 @@ import { useDesk } from "@/lib/use-desk";
 import { ProductCard } from "@/components/product-card";
 import { CartPanel } from "@/components/cart-panel";
 import { WebCard } from "@/components/web-card";
-import { adviseStore, capturePaypal, refundPaypal, searchWeb, serviceHealth, startCheckout, type WebHit } from "@/lib/paypal";
+import { adviseStore, capturePaypal, refundPaypal, searchWeb, serviceHealth, startCheckout } from "@/lib/paypal";
 
 const STARTERS = [
   { label: "Earbuds under $80", run: "Noise-cancelling earbuds under 80" },
@@ -15,6 +15,7 @@ const STARTERS = [
   { label: "Desk setup under $60", run: "Desk setup under 60" },
   { label: "Travel kit in 3 days", run: "Travel kit in 3 days under 130" },
   { label: "Compare buds and headphones", run: "Compare earbuds and headphones" },
+  { label: "Mug under $20", run: "Ceramic mug under 20" },
 ];
 
 export function DeskApp() {
@@ -22,7 +23,12 @@ export function DeskApp() {
   const lines = useDesk((s) => s.lines);
   const orders = useDesk((s) => s.orders);
   const turns = useDesk((s) => s.turns);
+  const chats = useDesk((s) => s.chats);
+  const activeId = useDesk((s) => s.activeId);
   const setBudget = useDesk((s) => s.setBudget);
+  const ensureChats = useDesk((s) => s.ensureChats);
+  const newChat = useDesk((s) => s.newChat);
+  const openChat = useDesk((s) => s.openChat);
   const send = useDesk((s) => s.send);
   const replaceTurn = useDesk((s) => s.replaceTurn);
   const setQty = useDesk((s) => s.setQty);
@@ -36,8 +42,6 @@ export function DeskApp() {
   const [aisle, setAisle] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
-  const [webHits, setWebHits] = useState<WebHit[]>([]);
-  const [webTurn, setWebTurn] = useState<string | null>(null);
   const [health, setHealth] = useState<{ paypal: boolean; grok: boolean; channel3: boolean } | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const total = cartTotal(lines);
@@ -49,6 +53,7 @@ export function DeskApp() {
   useEffect(() => {
     let cancel = false;
     void Promise.resolve(useDesk.persist.rehydrate()).finally(async () => {
+      ensureChats();
       setReady(true);
       const params = new URLSearchParams(window.location.search);
       const token = params.get("token");
@@ -71,7 +76,7 @@ export function DeskApp() {
     return () => {
       cancel = true;
     };
-  }, [note, recordPaid, setReady]);
+  }, [ensureChats, note, recordPaid, setReady]);
 
   useEffect(() => {
     const node = threadRef.current;
@@ -83,8 +88,6 @@ export function DeskApp() {
     const result = send(text, display);
     setDraft("");
     setAisle(false);
-    setWebHits([]);
-    setWebTurn(null);
     if (result.paypalRefundId && result.turnId) {
       setBusy("Sending that back through PayPal");
       const refunded = await refundPaypal(result.paypalRefundId);
@@ -99,9 +102,7 @@ export function DeskApp() {
       setBusy("Asking Channel3");
       const found = await searchWeb(result.webQuery, useDesk.getState().budget);
       if (found.ok && found.results.length) {
-        replaceTurn(result.turnId, "Channel3 found these. PayPal charges the price on the card.");
-        setWebHits(found.results);
-        setWebTurn(result.turnId);
+        replaceTurn(result.turnId, "Channel3 found these. PayPal charges the price on the card.", { hits: found.results });
       } else replaceTurn(result.turnId, found.error || "Channel3 had nothing under that ceiling.");
       setBusy(null);
       return;
@@ -200,7 +201,7 @@ export function DeskApp() {
   );
 
   return (
-    <div className="flex h-dvh flex-col bg-paper text-ink">
+    <div className="flex h-dvh flex-col overflow-hidden bg-paper text-ink">
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
@@ -212,6 +213,7 @@ export function DeskApp() {
               <p className="mt-1 hidden text-sm text-muted sm:block">
                 {health?.paypal ? "PayPal sandbox is connected" : "Cheap or fast, decided before you pay."}
                 {health?.grok ? " - Grok picks the store" : ""}
+                {health?.channel3 ? " - Channel3 searches past the aisle" : ""}
               </p>
             </div>
           </div>
@@ -232,8 +234,24 @@ export function DeskApp() {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-6xl min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section className="flex min-h-0 flex-col">
+      <div className="mx-auto grid w-full max-w-6xl min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="flex min-h-0 flex-col overflow-hidden">
+          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-4 py-2" role="navigation" aria-label="Chats">
+            <button type="button" className="min-h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-on-brass" onClick={() => newChat()}>
+              New chat
+            </button>
+            {chats.map((chat) => (
+              <button
+                key={chat.id}
+                type="button"
+                aria-current={chat.id === activeId ? "true" : undefined}
+                className={`min-h-11 max-w-56 shrink-0 truncate rounded-full border px-4 text-left text-sm ${chat.id === activeId ? "border-ink bg-sheet font-medium" : "border-line"}`}
+                onClick={() => openChat(chat.id)}
+              >
+                {chat.title}
+              </button>
+            ))}
+          </div>
           <div ref={threadRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
             {turns.length === 0 ? (
               <div className="flex flex-col gap-5">
@@ -304,9 +322,9 @@ export function DeskApp() {
                       })}
                     </div>
                   ) : null}
-                  {turn.id === webTurn ? (
+                  {turn.hits?.length ? (
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      {webHits.map((hit) => (
+                      {turn.hits.map((hit) => (
                         <WebCard key={hit.id} hit={hit} onPay={(id) => void payWeb(id)} />
                       ))}
                     </div>
@@ -347,7 +365,7 @@ export function DeskApp() {
             )}
           </div>
 
-          <form onSubmit={onSubmit} className="flex gap-2 border-t border-line bg-paper px-4 py-3">
+          <form onSubmit={onSubmit} className="relative z-10 flex shrink-0 gap-2 border-t border-line bg-paper px-4 py-3">
             <label className="sr-only" htmlFor="ask">
               Ask Cartling
             </label>
