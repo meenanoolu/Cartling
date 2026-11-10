@@ -48,24 +48,27 @@ class PayPalClient:
             response.raise_for_status()
             return response.json()
 
-    async def create_checkout(self, amount: str, description: str, items: list, return_url: str, cancel_url: str):
+    async def create_checkout(self, amount: str, description: str, items: list, return_url: str, cancel_url: str, shipping=None):
         await self.get_token()
+        purchase = {
+            "description": description[:120],
+            "amount": {
+                "currency_code": "USD",
+                "value": amount,
+                "breakdown": {"item_total": {"currency_code": "USD", "value": amount}},
+            },
+            "items": items,
+        }
+        preference = "NO_SHIPPING"
+        if shipping:
+            purchase["shipping"] = shipping
+            preference = "SET_PROVIDED_ADDRESS"
         payload = {
             "intent": "CAPTURE",
-            "purchase_units": [
-                {
-                    "description": description[:120],
-                    "amount": {
-                        "currency_code": "USD",
-                        "value": amount,
-                        "breakdown": {"item_total": {"currency_code": "USD", "value": amount}},
-                    },
-                    "items": items,
-                }
-            ],
+            "purchase_units": [purchase],
             "application_context": {
                 "brand_name": "Cartling",
-                "shipping_preference": "NO_SHIPPING",
+                "shipping_preference": preference,
                 "user_action": "PAY_NOW",
                 "return_url": return_url,
                 "cancel_url": cancel_url,

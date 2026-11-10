@@ -39,6 +39,30 @@ class CheckoutIn(BaseModel):
     lines: list[LineIn] = Field(default_factory=list)
     budget: float = 100
     webId: Optional[str] = None
+    address: Optional[dict] = None
+
+
+def shipping_from(raw: Optional[dict]) -> Optional[dict]:
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "").strip()
+    line1 = str(raw.get("line1") or "").strip()
+    city = str(raw.get("city") or "").strip()
+    region = str(raw.get("region") or "").strip()
+    postal = str(raw.get("postal") or "").strip()
+    country = str(raw.get("country") or "").strip().upper()
+    if not name or not line1 or not city or not region or len(postal) < 3 or len(country) != 2:
+        return None
+    return {
+        "name": {"full_name": name[:300]},
+        "address": {
+            "address_line_1": line1[:300],
+            "admin_area_2": city[:120],
+            "admin_area_1": region[:300],
+            "postal_code": postal[:60],
+            "country_code": country,
+        },
+    }
 
 
 class AdviseIn(BaseModel):
@@ -169,10 +193,13 @@ async def checkout(body: CheckoutIn, request: Request):
         }
         for line in priced
     ]
+    shipping = shipping_from(body.address)
+    if not shipping:
+        raise HTTPException(status_code=400, detail="Add a ship-to address before PayPal can open")
     base = origin(request)
     description = "Cartling - " + ", ".join(line["name"] for line in priced)
     try:
-        created = await paypal.create_checkout(money(total), description, items, f"{base}/?paypal=return", f"{base}/?paypal=cancel")
+        created = await paypal.create_checkout(money(total), description, items, f"{base}/?paypal=return", f"{base}/?paypal=cancel", shipping)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=502, detail=paypal_message(exc)) from exc
     order_id = created.get("id")
