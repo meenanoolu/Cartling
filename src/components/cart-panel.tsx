@@ -141,7 +141,7 @@ export function CartPanel({
           {paying ? "Opening PayPal" : lines.length === 0 ? "Nothing to pay" : `Pay ${money(total)} with PayPal`}
         </button>
         <p className="text-sm leading-relaxed text-muted">
-          PayPal sandbox charges this exact total. The server prices every line. A refund goes back through PayPal.
+          PayPal sandbox only. Log in as a sandbox buyer, not a real PayPal account. The server prices every line. A refund goes back through PayPal.
         </p>
       </section>
       <section className="flex flex-col gap-3">

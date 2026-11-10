@@ -324,7 +324,7 @@ export function DeskApp() {
                   The annoying parts, handled before you pay.
                 </h1>
                 <p className="max-w-xl text-lg leading-relaxed text-muted">
-                  One desk instead of a pile of tabs. The cheap store and the fast store stay separate. The ceiling refuses the extra, and a refund forgets you owned it.
+                  One desk instead of a pile of tabs. The cheap store and the fast store stay separate. The ceiling refuses the extra, and a refund forgets you owned it. Pay uses a PayPal sandbox buyer, not a real PayPal login.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {STARTERS.map((prompt) => (
