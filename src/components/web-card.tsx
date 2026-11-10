@@ -5,16 +5,18 @@ export function WebCard({ hit, onPay }: { hit: WebHit; onPay: (id: string) => vo
   return (
     <article className="flex flex-col overflow-hidden rounded-card border border-line bg-sheet">
       {hit.image ? (
-        <img src={hit.image} alt={hit.name} className="aspect-square w-full object-cover" />
+        <div className="grid h-36 place-items-center bg-white">
+          <img src={hit.image} alt={hit.name} className="h-full w-full object-contain" />
+        </div>
       ) : (
-        <div className="grid aspect-square w-full place-items-center bg-paper text-sm text-muted">Channel3</div>
+        <div className="grid h-36 place-items-center bg-paper text-sm text-muted">No photo</div>
       )}
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-display text-xl leading-tight font-medium">{hit.name}</h3>
           <p className="shrink-0 text-lg font-medium tabular-nums">{money(hit.price)}</p>
         </div>
-        <p className="text-sm leading-relaxed text-muted">{hit.blurb}</p>
+        <p className="line-clamp-3 text-sm leading-relaxed text-muted">{hit.blurb}</p>
         <p className="text-sm text-muted">{hit.store} · Channel3</p>
         <button
           type="button"

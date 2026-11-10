@@ -23,7 +23,9 @@ export function ProductCard({
 
   return (
     <article className="flex flex-col overflow-hidden rounded-card border border-line bg-sheet">
-      <img src={product.image} alt={product.name} className="aspect-square w-full object-cover" />
+      <div className="grid h-36 place-items-center bg-white">
+        <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
+      </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-display text-xl leading-tight font-medium">{product.name}</h3>
