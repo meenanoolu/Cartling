@@ -229,6 +229,31 @@ def _saved_capture(saved: dict) -> dict:
     }
 
 
+def paypal_label(order: dict) -> str:
+    units = order.get("purchase_units") or [{}]
+    payments = (units[0].get("payments") or {})
+    captures = payments.get("captures") or []
+    refunds = payments.get("refunds") or []
+    if refunds or any(row.get("status") == "REFUNDED" for row in captures):
+        return "REFUNDED"
+    if any(row.get("status") == "PARTIALLY_REFUNDED" for row in captures):
+        return "PARTIALLY_REFUNDED"
+    if captures and captures[0].get("status"):
+        return str(captures[0]["status"])
+    return str(order.get("status") or "UNKNOWN")
+
+
+@app.get("/api/orders/{order_id}")
+async def order_status(order_id: str):
+    if not paypal.ready():
+        raise HTTPException(status_code=503, detail="PayPal sandbox keys are not set on the server")
+    try:
+        remote = await paypal.get_order(order_id)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=paypal_message(exc)) from exc
+    return {"ok": True, "orderId": order_id, "status": paypal_label(remote)}
+
+
 @app.post("/api/orders/{order_id}/capture")
 async def capture(order_id: str):
     if not paypal.ready():
