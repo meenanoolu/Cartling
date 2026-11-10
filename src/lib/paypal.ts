@@ -31,12 +31,13 @@ export async function startCheckout(body: {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
     });
     const data = (await res.json()) as { ok?: boolean; approveUrl?: string; error?: string };
     if (!res.ok || !data.approveUrl) return { ok: false, error: data.error || "PayPal did not open" };
     return { ok: true, approveUrl: data.approveUrl };
   } catch {
-    return { ok: false, error: "This page cannot reach the PayPal server" };
+    return { ok: false, error: "PayPal took too long. Try the pay button again." };
   }
 }
 
@@ -111,11 +112,12 @@ export async function searchWeb(query: string, maxPrice: number): Promise<{ ok: 
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, maxPrice }),
+      signal: AbortSignal.timeout(25000),
     });
     const data = (await res.json()) as { ok?: boolean; results?: WebHit[]; error?: string };
     if (!res.ok || !data.ok) return { ok: false, results: [], error: data.error || "Channel3 did not answer" };
     return { ok: true, results: data.results ?? [] };
   } catch {
-    return { ok: false, results: [], error: "This page cannot reach Channel3" };
+    return { ok: false, results: [], error: "Channel3 did not answer. Try that search again." };
   }
 }

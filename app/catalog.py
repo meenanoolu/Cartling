@@ -7,54 +7,90 @@ load_dotenv()
 CHANNEL3_KEY = os.getenv("CHANNEL3_API_KEY")
 CHANNEL3_URL = "https://api.trychannel3.com/v1/search"
 
+
+def _amount(value):
+    if isinstance(value, dict):
+        value = value.get("price", value.get("value", value.get("amount")))
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number <= 0:
+        return None
+    return number
+
+
+def _store(offer: dict) -> str:
+    raw = offer.get("merchant") or offer.get("retailer") or offer.get("seller") or offer.get("domain") or "Store"
+    text = str(raw).replace("www.", "").strip()
+    return text[:60] or "Store"
+
+
+def _image(product: dict):
+    raw = product.get("image")
+    images = product.get("images") or []
+    if not raw and images:
+        raw = images[0]
+    if isinstance(raw, dict):
+        raw = raw.get("url") or raw.get("src") or raw.get("image")
+    return raw if isinstance(raw, str) else ""
+
+
 async def search_and_compare(query: str, max_price: float) -> dict:
     if not CHANNEL3_KEY:
         return {"error": "CHANNEL3_API_KEY not set", "results": []}
 
     payload = {
         "query": query,
-        "filters": {
-            "price": {"max_price": max_price}
-        },
-        "limit": 8
+        "filters": {"price": {"max_price": max_price}},
+        "limit": 8,
     }
 
-    async with httpx.AsyncClient() as client:
-        r = await client.post(
-            CHANNEL3_URL,
-            headers={
-                "x-api-key": CHANNEL3_KEY,
-                "Content-Type": "application/json"
-            },
-            json=payload,
-            timeout=30.0
-        )
-        r.raise_for_status()
-        data = r.json()
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                CHANNEL3_URL,
+                headers={"x-api-key": CHANNEL3_KEY, "Content-Type": "application/json"},
+                json=payload,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPError:
+        return {"error": "Channel3 did not answer", "results": []}
+    except ValueError:
+        return {"error": "Channel3 sent a response that was not readable", "results": []}
 
+    products = data.get("products", []) if isinstance(data, dict) else []
     results = []
-    for p in data.get("products", []):
-        offers = p.get("offers", [])
-        if not offers:
+    for product in products:
+        if not isinstance(product, dict):
             continue
-        best = min(offers, key=lambda o: o.get("price", 999999))
-        results.append({
-            "id": p.get("id") or p.get("title", "")[:40],
-            "name": p.get("title", "Unknown"),
-            "description": p.get("description", "")[:200],
-            "best_price": best.get("price"),
-            "best_store": best.get("merchant") or best.get("retailer") or "Unknown",
-            "all_stores": [
-                {"store": o.get("merchant") or o.get("retailer"), "price": o.get("price")}
-                for o in offers[:5]
-            ],
-            "image": p.get("image") or (p.get("images") or [None])[0],
-            "buy_url": best.get("url")
-        })
+        priced = []
+        for offer in product.get("offers") or []:
+            if not isinstance(offer, dict):
+                continue
+            amount = _amount(offer.get("price"))
+            if amount is None or amount > float(max_price) + 0.001:
+                continue
+            priced.append((amount, offer))
+        if not priced:
+            continue
+        amount, best = min(priced, key=lambda row: row[0])
+        results.append(
+            {
+                "id": product.get("id") or str(product.get("title") or "")[:40],
+                "name": product.get("title") or "Unknown",
+                "description": str(product.get("description") or "")[:200],
+                "best_price": amount,
+                "best_store": _store(best),
+                "image": _image(product),
+                "buy_url": best.get("url"),
+            }
+        )
 
     return {"results": results, "query": query, "max_price": max_price}
 
 
 def build_cart(item_ids: list, budget: float) -> dict:
-    # Kept for compatibility; Channel3 flow mainly uses search results
     return {"items": [], "total": 0, "budget": budget, "within_budget": True, "note": "Use search results directly"}
