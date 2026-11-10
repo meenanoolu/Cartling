@@ -3,16 +3,28 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { money, productById } from "./catalog";
 import { buildOrder, cartTotal, interpret, newTurn, type CartLine, type Order, type Turn } from "./desk-engine";
 
+export type Chat = {
+  id: string;
+  title: string;
+  turns: Turn[];
+  updated: number;
+};
+
 type DeskState = {
   ready: boolean;
   budget: number;
   lines: CartLine[];
   orders: Order[];
   turns: Turn[];
+  chats: Chat[];
+  activeId: string;
   focusId: string | null;
   focusStore: string | null;
   setReady: (ready: boolean) => void;
   setBudget: (budget: number) => void;
+  ensureChats: () => void;
+  newChat: () => void;
+  openChat: (id: string) => void;
   send: (text: string, display?: string) => {
     polish: boolean;
     brief: string;
@@ -39,10 +51,42 @@ export const useDesk = create<DeskState>()(
       lines: [],
       orders: [],
       turns: [],
+      chats: [],
+      activeId: "",
       focusId: null,
       focusStore: null,
       setReady: (ready) => set({ ready }),
       setBudget: (budget) => set({ budget: clampBudget(budget) }),
+      ensureChats: () => {
+        const desk = get();
+        if (desk.activeId && desk.chats.some((chat) => chat.id === desk.activeId)) return;
+        const id = desk.activeId || chatId();
+        if (!desk.turns.length) {
+          set({ activeId: id });
+          return;
+        }
+        set({
+          activeId: id,
+          chats: [{ id, title: titleOf(desk.turns), turns: desk.turns, updated: Date.now() }],
+        });
+      },
+      newChat: () => {
+        const desk = get();
+        if (!desk.turns.length) return;
+        const id = chatId();
+        set({
+          ...saved(desk, desk.turns),
+          activeId: id,
+          turns: [],
+        });
+      },
+      openChat: (id) => {
+        const desk = get();
+        const next = saved(desk, desk.turns);
+        const chat = next.chats.find((row) => row.id === id);
+        if (!chat) return;
+        set({ ...next, activeId: id, turns: chat.turns });
+      },
       send: (text, display) => {
         const clean = text.trim();
         if (!clean) return { polish: false, brief: "", turnId: null };
@@ -67,9 +111,8 @@ export const useDesk = create<DeskState>()(
         });
         if (paypalRefund) {
           const pending = newTurn("cartling", `Sending ${paypalRefund.id} back through PayPal.`);
-          set({
-            turns: [...desk.turns, newTurn("you", display?.trim() || clean), pending].slice(-40),
-          });
+          const turns = [...desk.turns, newTurn("you", display?.trim() || clean), pending].slice(-40);
+          set(saved(desk, turns));
           return {
             polish: false,
             brief: "",
@@ -77,13 +120,14 @@ export const useDesk = create<DeskState>()(
             paypalRefundId: paypalRefund.id,
           };
         }
+        const turns = [...desk.turns, newTurn("you", display?.trim() || clean), reply].slice(-40);
         set({
+          ...saved(desk, turns),
           budget: result.budget ?? desk.budget,
           lines: result.lines ?? desk.lines,
           orders: result.orders ?? desk.orders,
           focusId: result.focusId === undefined ? desk.focusId : result.focusId,
           focusStore: result.focusStore === undefined ? desk.focusStore : result.focusStore,
-          turns: [...desk.turns, newTurn("you", display?.trim() || clean), reply].slice(-40),
         });
         return {
           polish: result.polish,
@@ -94,10 +138,11 @@ export const useDesk = create<DeskState>()(
           stores: result.stores,
         };
       },
-      replaceTurn: (id, text, patch) =>
-        set({
-          turns: get().turns.map((turn) => (turn.id === id ? { ...turn, ...patch, text } : turn)),
-        }),
+      replaceTurn: (id, text, patch) => {
+        const desk = get();
+        const turns = desk.turns.map((turn) => (turn.id === id ? { ...turn, ...patch, text } : turn));
+        set(saved(desk, turns));
+      },
       setQty: (productId, qty) => {
         const current = get().lines;
         const lines = current.flatMap((line) => {
@@ -118,43 +163,49 @@ export const useDesk = create<DeskState>()(
         return true;
       },
       pay: () => {
-        const { lines, budget, orders, turns } = get();
-        const total = cartTotal(lines);
-        if (lines.length === 0 || total > budget + 0.001) return null;
-        const order = buildOrder(lines);
+        const desk = get();
+        const total = cartTotal(desk.lines);
+        if (desk.lines.length === 0 || total > desk.budget + 0.001) return null;
+        const order = buildOrder(desk.lines);
         const stores = [...new Set(order.lines.map((line) => line.store))];
-        const reply = newTurn(
-          "cartling",
-          `Paid ${order.id} for ${money(total)}. ${stores.length} package${stores.length === 1 ? "" : "s"}: ${stores.join(", ")}. Say refund if it is wrong.`,
-        );
-        set({
-          lines: [],
-          orders: [...orders, order],
-          turns: [...turns, reply].slice(-40),
-        });
+        const turns = [
+          ...desk.turns,
+          newTurn(
+            "cartling",
+            `Paid ${order.id} for ${money(total)}. ${stores.length} package${stores.length === 1 ? "" : "s"}: ${stores.join(", ")}. Say refund if it is wrong.`,
+          ),
+        ].slice(-40);
+        set({ ...saved(desk, turns), lines: [], orders: [...desk.orders, order] });
         return order.id;
       },
-      note: (text) => set({ turns: [...get().turns, newTurn("cartling", text)].slice(-40) }),
+      note: (text) => {
+        const desk = get();
+        set(saved(desk, [...desk.turns, newTurn("cartling", text)].slice(-40)));
+      },
       recordPaid: (order, clearCart) => {
+        const desk = get();
         const stores = [...new Set(order.lines.map((line) => line.store))];
         const packs = `${stores.length} package${stores.length === 1 ? "" : "s"}: ${stores.join(", ")}`;
+        const turns = [
+          ...desk.turns,
+          newTurn("cartling", `Paid ${order.id} for ${money(order.total)} through PayPal. ${packs}. Refund sends it back through PayPal.`),
+        ].slice(-40);
         set({
-          lines: clearCart ? [] : get().lines,
-          orders: [...get().orders.filter((row) => row.id !== order.id), order],
-          turns: [
-            ...get().turns,
-            newTurn("cartling", `Paid ${order.id} for ${money(order.total)} through PayPal. ${packs}. Refund sends it back through PayPal.`),
-          ].slice(-40),
+          ...saved(desk, turns),
+          lines: clearCart ? [] : desk.lines,
+          orders: [...desk.orders.filter((row) => row.id !== order.id), order],
         });
       },
       refund: (id, quiet) => {
-        const order = get().orders.find((row) => row.id === id && row.status === "paid");
+        const desk = get();
+        const order = desk.orders.find((row) => row.id === id && row.status === "paid");
         if (!order) return;
+        const turns = quiet
+          ? desk.turns
+          : [...desk.turns, newTurn("cartling", `Refunded ${id}${order.paypalOrderId ? " through PayPal" : ""}. ${money(order.total)} is released.`)].slice(-40);
         set({
-          orders: get().orders.map((row) => (row.id === id ? { ...row, status: "refunded" as const } : row)),
-          turns: quiet
-            ? get().turns
-            : [...get().turns, newTurn("cartling", `Refunded ${id}${order.paypalOrderId ? " through PayPal" : ""}. ${money(order.total)} is released.`)].slice(-40),
+          ...saved(desk, turns),
+          orders: desk.orders.map((row) => (row.id === id ? { ...row, status: "refunded" as const } : row)),
         });
       },
     }),
@@ -167,12 +218,32 @@ export const useDesk = create<DeskState>()(
         lines: state.lines,
         orders: state.orders,
         turns: state.turns,
+        chats: state.chats,
+        activeId: state.activeId,
         focusId: state.focusId,
         focusStore: state.focusStore,
       }),
     },
   ),
 );
+
+function chatId(): string {
+  return `chat-${Date.now().toString(36)}`;
+}
+
+function titleOf(turns: Turn[]): string {
+  const first = turns.find((turn) => turn.role === "you")?.text.trim();
+  if (!first) return "New chat";
+  return first.length > 42 ? `${first.slice(0, 42)}...` : first;
+}
+
+function saved(desk: { chats: Chat[]; activeId: string; turns: Turn[] }, turns: Turn[]) {
+  const id = desk.activeId || chatId();
+  const chat: Chat = { id, title: titleOf(turns), turns, updated: Date.now() };
+  const rest = desk.chats.filter((row) => row.id !== id);
+  const chats = turns.length ? [chat, ...rest].slice(0, 30) : rest;
+  return { activeId: id, turns, chats };
+}
 
 function clampBudget(value: number): number {
   if (!Number.isFinite(value)) return 100;

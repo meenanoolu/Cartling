@@ -41,6 +41,7 @@ export type Turn = {
   recommendStore?: string;
   stores?: Record<string, string>;
   actions?: TurnAction[];
+  hits?: { id: string; name: string; price: number; store: string; image: string; blurb: string }[];
 };
 
 export type DeskSnapshot = {
