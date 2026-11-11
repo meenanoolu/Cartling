@@ -76,16 +76,27 @@ async def search_and_compare(query: str, max_price: float) -> dict:
             priced.append((amount, offer))
         if not priced:
             continue
-        amount, best = min(priced, key=lambda row: row[0])
+        by_store = {}
+        for amount, offer in priced:
+            store = _store(offer)
+            kept = by_store.get(store)
+            if kept is None or amount < kept[0]:
+                by_store[store] = (amount, offer)
+        offers = [
+            {"store": store, "price": round(amount, 2)}
+            for store, (amount, _offer) in sorted(by_store.items(), key=lambda item: item[1][0])
+        ][:4]
+        cheapest = offers[0]
         results.append(
             {
                 "id": product.get("id") or str(product.get("title") or "")[:40],
                 "name": product.get("title") or "Unknown",
                 "description": str(product.get("description") or "")[:200],
-                "best_price": amount,
-                "best_store": _store(best),
+                "offers": offers,
+                "best_price": cheapest["price"],
+                "best_store": cheapest["store"],
                 "image": _image(product),
-                "buy_url": best.get("url"),
+                "buy_url": "",
             }
         )
 
