@@ -417,21 +417,8 @@ export function DeskApp() {
         <section className="flex min-h-0 flex-col overflow-hidden">
           <div ref={threadRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
             {turns.length === 0 ? (
-              <div className="flex flex-col gap-5">
-                <h1 className="max-w-xl font-display text-4xl leading-tight font-medium sm:text-5xl">
-                  Before Friday. Under $80.
-                </h1>
-                <p className="max-w-xl text-lg leading-relaxed text-muted">
-                  Maya needs earbuds and a cable. The cheap store takes five days. The fast one may not fit the ceiling. The total is not in any tab.
-                </p>
-                <ul className="max-w-xl list-disc pl-5 text-sm leading-relaxed text-muted">
-                  <li>The ceiling holds. Over it, PayPal does not open.</li>
-                  <li>A day is that store's handoff time, not a guess.</li>
-                  <li>Grok can pick a store. It cannot type the price.</li>
-                  <li>PayPal stays closed until you say yes.</li>
-                </ul>
-                <div className="flex flex-wrap gap-2">
-                  {STARTERS.map((prompt) => (
+              <div className="flex flex-wrap gap-2">
+                {STARTERS.map((prompt) => (
                     <button
                       key={prompt.run}
                       type="button"
@@ -441,7 +428,6 @@ export function DeskApp() {
                       {prompt.label}
                     </button>
                   ))}
-                </div>
               </div>
             ) : null}
 
