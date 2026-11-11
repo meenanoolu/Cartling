@@ -28,8 +28,8 @@ export const PRODUCTS: Product[] = [
     pairs: [],
     facts: ["30 hours with the case", "Active noise cancelling", "Light enough for a commute"],
     offers: [
-      { store: "BudgetBuy", price: 69.99, ships: "4 days", days: 4 },
-      { store: "GadgetHub", price: 74.5, ships: "2 days", days: 2 },
+      { store: "BudgetBuy", price: 48, ships: "4 days", days: 4 },
+      { store: "GadgetHub", price: 58, ships: "2 days", days: 2 },
       { store: "TechStore", price: 79.99, ships: "2 days", days: 2 },
     ],
   },
