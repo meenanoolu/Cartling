@@ -489,7 +489,10 @@ async def shop_with_grok(message: str, budget: float, intent: str = "shop") -> d
         tool_choice = "auto"
         if confirm:
             break
-    if confirm:
+    if len(products) > 1:
+        confirm = None
+        spoken = "These fit the day and the ceiling. Add them. PayPal stays closed until you pay the cart."
+    elif confirm:
         spoken = (
             f"Grok called create_paypal_order for {confirm['name']} from {confirm['store']}. "
             f"PayPal is not open until you say yes. The server price is ${float(confirm['price']):.2f}."

@@ -170,11 +170,7 @@ export function DeskApp() {
             recommendStore: agent.store ?? existing?.recommendStore,
             stores: agent.recommendId && agent.store ? { ...(existing?.stores ?? {}), [agent.recommendId]: agent.store } : existing?.stores,
             confirm,
-            actions: confirm
-              ? [{ label: "Yes, open PayPal", run: "confirm-paypal" }]
-              : agent.recommendId && agent.store
-                ? [{ label: "Yes, open PayPal", run: "stage-paypal" }]
-                : undefined,
+            actions: confirm ? [{ label: "Yes, open PayPal", run: "confirm-paypal" }] : undefined,
           });
           setBusy(null);
           return;
