@@ -506,7 +506,7 @@ export function interpret(raw: string, desk: DeskSnapshot): EngineResult {
       .replace(/\b(the|a|an|for|me|please|show|find|need|want|i|some|something)\b/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    if (leftover.length >= 3) {
+    if (leftover.length >= 2) {
       return {
         say: "Nothing in the aisle matches that. Asking Channel3.",
         webQuery: raw.trim(),
