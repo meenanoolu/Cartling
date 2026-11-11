@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.agent import run_agent
-from app.desk_data import advise, channel3_search, cents, money, price_cart, web_hit
+from app.desk_data import advise, channel3_search, cents, money, price_cart, shop_with_grok, web_hit
 from app.order_store import get_order, save_order
 from app.paypal_client import PayPalClient
 
@@ -74,6 +74,12 @@ class AdviseIn(BaseModel):
 class SearchIn(BaseModel):
     query: str
     maxPrice: float = 100
+
+
+class AgentIn(BaseModel):
+    message: str
+    budget: float = 100
+    intent: str = "shop"
 
 
 def paypal_message(exc: httpx.HTTPStatusError) -> str:
@@ -152,6 +158,12 @@ async def search_route(body: SearchIn):
         raise HTTPException(status_code=400, detail="Say what you want")
     ceiling = min(2000, max(1, float(body.maxPrice)))
     return await channel3_search(query, ceiling)
+
+
+@app.post("/api/agent")
+async def agent_route(body: AgentIn):
+    intent = body.intent if body.intent in ("shop", "pay") else "shop"
+    return await shop_with_grok(body.message, body.budget, intent)
 
 
 @app.post("/api/checkout")
