@@ -498,8 +498,8 @@ async def shop_with_grok(message: str, budget: float, intent: str = "shop") -> d
         first = products[0]
         offer = first["offers"][0]
         spoken = f"{first['name']} is ${float(offer['price']):.2f} at {offer['store']}, {offer['ships']}."
-    elif not spoken and hits:
-        spoken = "Channel3 returned these merchants. PayPal charges the price on the row you pick."
+    elif hits:
+        spoken = "Channel3 returned these. Open Description on a card, then pick a merchant."
     elif not spoken:
         return {"ok": False, "error": "Grok did not use a tool"}
     product_ids = [product["product_id"] for product in products]
