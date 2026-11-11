@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { ShoppingBag, X } from "lucide-react";
+import { PanelLeft, ShoppingBag, X } from "lucide-react";
 import { PRODUCTS, money, productById } from "@/lib/catalog";
 import { cartTotal, type ShipTo } from "@/lib/desk-engine";
 import { polishReply } from "@/lib/voice";
@@ -46,6 +46,7 @@ export function DeskApp() {
   const [busy, setBusy] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
+  const [chatsOpen, setChatsOpen] = useState(true);
   const [pendingAsk, setPendingAsk] = useState<string | null>(null);
   const [health, setHealth] = useState<{ paypal: boolean; grok: boolean; channel3: boolean } | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -323,6 +324,15 @@ export function DeskApp() {
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label={chatsOpen ? "Hide chats" : "Show chats"}
+              aria-expanded={chatsOpen}
+              className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-sheet"
+              onClick={() => setChatsOpen((open) => !open)}
+            >
+              <PanelLeft className="size-5" aria-hidden="true" />
+            </button>
             <span className="grid size-10 place-items-center rounded-xl bg-brass text-on-brass">
               <ShoppingBag className="size-5" aria-hidden="true" />
             </span>
@@ -352,43 +362,49 @@ export function DeskApp() {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-6xl min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section className="flex min-h-0 flex-col overflow-hidden">
-          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-4 py-2" role="navigation" aria-label="Chats">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {chatsOpen ? (
+          <button type="button" aria-label="Close chats" className="absolute inset-0 z-20 bg-ink/30 md:hidden" onClick={() => setChatsOpen(false)} />
+        ) : null}
+        <aside className={`${chatsOpen ? "absolute inset-y-0 left-0 z-30 flex w-64 md:static" : "hidden"} min-h-0 shrink-0 flex-col border-r border-line bg-sheet`}>
+          <div className="flex flex-col gap-2 border-b border-line p-3">
             <button
               type="button"
-              className="min-h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-on-brass"
+              className="min-h-11 rounded-xl bg-ink px-4 text-sm font-medium text-on-brass"
               onClick={() => {
                 setAddressOpen(false);
                 setPendingAsk(null);
                 newChat();
+                if (window.innerWidth < 768) setChatsOpen(false);
               }}
             >
               New chat
             </button>
-            <button
-              type="button"
-              className="min-h-11 shrink-0 rounded-full border border-line bg-sheet px-4 text-sm"
-              onClick={() => setAddressOpen((open) => !open)}
-            >
+            <button type="button" className="min-h-11 rounded-xl border border-line bg-paper px-4 text-left text-sm" onClick={() => setAddressOpen((open) => !open)}>
               {shipTo ? `Ship to ${shipTo.city}` : "Add address"}
             </button>
+          </div>
+          <nav aria-label="Chats" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
             {chats.map((chat) => (
               <button
                 key={chat.id}
                 type="button"
                 aria-current={chat.id === activeId ? "true" : undefined}
-                className={`min-h-11 max-w-56 shrink-0 truncate rounded-full border px-4 text-left text-sm ${chat.id === activeId ? "border-ink bg-sheet font-medium" : "border-line"}`}
+                className={`min-h-11 rounded-xl px-3 py-2 text-left text-sm ${chat.id === activeId ? "bg-paper font-medium" : ""}`}
                 onClick={() => {
                   setAddressOpen(false);
                   setPendingAsk(null);
                   openChat(chat.id);
+                  if (window.innerWidth < 768) setChatsOpen(false);
                 }}
               >
-                {chat.title}
+                <span className="line-clamp-2">{chat.title}</span>
               </button>
             ))}
-          </div>
+          </nav>
+        </aside>
+        <div className="mx-auto grid w-full min-w-0 max-w-6xl min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="flex min-h-0 flex-col overflow-hidden">
           <div ref={threadRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
             {turns.length === 0 ? (
               <div className="flex flex-col gap-5">
@@ -590,6 +606,7 @@ export function DeskApp() {
           </div>
         </div>
       ) : null}
+    </div>
     </div>
   );
 }
