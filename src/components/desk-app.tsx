@@ -33,6 +33,7 @@ export function DeskApp() {
   const setStore = useDesk((s) => s.setStore);
   const note = useDesk((s) => s.note);
   const recordPaid = useDesk((s) => s.recordPaid);
+  const syncPaypal = useDesk((s) => s.syncPaypal);
   const refund = useDesk((s) => s.refund);
   const shipTo = useDesk((s) => s.shipTo);
   const setShipTo = useDesk((s) => s.setShipTo);
@@ -86,6 +87,25 @@ export function DeskApp() {
     if (!node) return;
     node.scrollTop = node.scrollHeight;
   }, [turns, busy]);
+
+  useEffect(() => {
+    const pending = orders.filter((order) => order.paypalOrderId && (order.status === "paid" || order.paypalTotal == null));
+    if (!pending.length) return;
+    let stop = false;
+    const tick = async () => {
+      for (const order of pending) {
+        if (stop || !order.paypalOrderId) return;
+        const live = await paypalStatus(order.paypalOrderId);
+        if (live.ok && live.label) syncPaypal(order.id, live.label, live.paypalTotal);
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 20000);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, [orders, syncPaypal]);
 
   async function submit(text: string, display?: string) {
     const result = send(text, display);

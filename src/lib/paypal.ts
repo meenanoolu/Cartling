@@ -68,6 +68,7 @@ export async function capturePaypal(orderId: string): Promise<{
       orderId?: string;
       captureId?: string;
       total?: number;
+      paypalTotal?: number;
       clearCart?: boolean;
       lines?: OrderLine[];
     };
@@ -83,6 +84,7 @@ export async function capturePaypal(orderId: string): Promise<{
         status: "paid",
         paypalOrderId: data.orderId,
         paypalCaptureId: data.captureId,
+        paypalTotal: data.paypalTotal == null ? undefined : Number(data.paypalTotal),
       },
     };
   } catch {
@@ -90,12 +92,12 @@ export async function capturePaypal(orderId: string): Promise<{
   }
 }
 
-export async function paypalStatus(orderId: string): Promise<{ ok: boolean; label?: string; error?: string }> {
+export async function paypalStatus(orderId: string): Promise<{ ok: boolean; label?: string; paypalTotal?: number; error?: string }> {
   try {
     const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { signal: AbortSignal.timeout(20000) });
-    const data = (await res.json()) as { ok?: boolean; status?: string; error?: string };
+    const data = (await res.json()) as { ok?: boolean; status?: string; paypalTotal?: number; error?: string };
     if (!res.ok || !data.ok || !data.status) return { ok: false, error: data.error || "PayPal did not return a status" };
-    return { ok: true, label: data.status };
+    return { ok: true, label: data.status, paypalTotal: data.paypalTotal == null ? undefined : Number(data.paypalTotal) };
   } catch {
     return { ok: false, error: "PayPal status did not answer" };
   }

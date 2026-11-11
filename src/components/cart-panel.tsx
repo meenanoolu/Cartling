@@ -161,6 +161,12 @@ export function CartPanel({
                   {" · "}
                   {order.id}
                 </p>
+                {order.paypalTotal != null ? (
+                  <p className="mt-1 text-sm text-muted">
+                    PayPal captured {money(order.paypalTotal)}
+                    {Math.abs(order.paypalTotal - order.total) > 0.009 ? `. The desk had ${money(order.total)}. These do not match.` : "."}
+                  </p>
+                ) : null}
                 <ul className="mt-2 flex flex-col gap-1 text-sm text-muted">
                   {order.lines.map((line) => (
                     <li key={`${order.id}-${line.productId}`}>

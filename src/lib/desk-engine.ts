@@ -28,6 +28,7 @@ export type Order = {
   status: "paid" | "refunded";
   paypalOrderId?: string;
   paypalCaptureId?: string;
+  paypalTotal?: number;
 };
 
 export type TurnAction = { label: string; run: string };

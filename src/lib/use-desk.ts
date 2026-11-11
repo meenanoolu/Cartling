@@ -44,6 +44,7 @@ type DeskState = {
   pay: () => string | null;
   note: (text: string, steps?: string[]) => void;
   recordPaid: (order: Order, clearCart: boolean) => void;
+  syncPaypal: (id: string, status: string, paypalTotal?: number) => void;
   refund: (id: string, quiet?: boolean) => void;
 };
 
@@ -204,13 +205,35 @@ export const useDesk = create<DeskState>()(
         const turns = [
           ...desk.turns,
           newTurn("cartling", `Paid ${order.id} for ${money(order.total)} through PayPal. ${packs}. Refund sends it back through PayPal.`, {
-            steps: ["Captured the PayPal order", order.paypalCaptureId ? `Capture ${order.paypalCaptureId} is COMPLETED` : "PayPal status COMPLETED"],
+            steps: [
+              "Captured the PayPal order",
+              order.paypalCaptureId ? `Capture ${order.paypalCaptureId} is COMPLETED` : "PayPal status COMPLETED",
+              ...(order.paypalTotal == null ? [] : [`PayPal captured ${money(order.paypalTotal)}`]),
+            ],
           }),
         ].slice(-40);
         set({
           ...saved(desk, turns),
           lines: clearCart ? [] : desk.lines,
           orders: [...desk.orders.filter((row) => row.id !== order.id), order],
+        });
+      },
+      syncPaypal: (id, status, paypalTotal) => {
+        const desk = get();
+        const order = desk.orders.find((row) => row.id === id);
+        if (!order) return;
+        const nextStatus = status === "REFUNDED" ? "refunded" : order.status;
+        const sameTotal = paypalTotal == null || (order.paypalTotal != null && Math.abs(order.paypalTotal - paypalTotal) < 0.001);
+        if (sameTotal && nextStatus === order.status) return;
+        const becameRefunded = order.status === "paid" && nextStatus === "refunded";
+        const turns = becameRefunded
+          ? [...desk.turns, newTurn("cartling", `PayPal refunded ${id}. ${money(order.total)} went back.`, { steps: ["PayPal reported REFUNDED"] })].slice(-40)
+          : desk.turns;
+        set({
+          ...saved(desk, turns),
+          orders: desk.orders.map((row) =>
+            row.id === id ? { ...row, status: nextStatus, paypalTotal: paypalTotal ?? row.paypalTotal } : row,
+          ),
         });
       },
       refund: (id, quiet) => {
