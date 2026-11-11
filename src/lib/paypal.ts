@@ -9,6 +9,7 @@ export type WebHit = {
   store: string;
   image: string;
   blurb: string;
+  features?: string[];
   offers?: WebOffer[];
 };
 
