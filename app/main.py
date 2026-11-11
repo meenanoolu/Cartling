@@ -236,9 +236,31 @@ def _saved_capture(saved: dict) -> dict:
         "orderId": saved.get("id"),
         "captureId": saved.get("capture_id"),
         "total": saved.get("total"),
+        "paypalTotal": saved.get("paypal_total"),
         "clearCart": saved.get("source") != "web",
         "lines": saved.get("lines") or [],
     }
+
+
+def remember_capture(saved: dict, capture_id: Optional[str], amount: Optional[str], status: str = "paid") -> dict:
+    if not saved.get("id"):
+        return saved
+    saved["status"] = status
+    if capture_id:
+        saved["capture_id"] = capture_id
+    if amount is not None:
+        saved["paypal_total"] = float(amount)
+    save_order(saved)
+    return saved
+
+
+def webhook_order_id(event: str, resource: dict) -> Optional[str]:
+    related = ((resource.get("supplementary_data") or {}).get("related_ids") or {})
+    if related.get("order_id"):
+        return str(related["order_id"])
+    if event.startswith("CHECKOUT.ORDER") and resource.get("id"):
+        return str(resource["id"])
+    return None
 
 
 def paypal_label(order: dict) -> str:
@@ -263,7 +285,41 @@ async def order_status(order_id: str):
         remote = await paypal.get_order(order_id)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=502, detail=paypal_message(exc)) from exc
-    return {"ok": True, "orderId": order_id, "status": paypal_label(remote)}
+    _capture_id, amount = capture_bits(remote)
+    saved = get_order(order_id)
+    paypal_total = float(amount) if amount is not None else saved.get("paypal_total")
+    if saved.get("id"):
+        label = paypal_label(remote)
+        status = "refunded" if label == "REFUNDED" else "paid" if label == "COMPLETED" else saved.get("status") or "created"
+        remember_capture(saved, _capture_id, amount, status)
+    return {"ok": True, "orderId": order_id, "status": paypal_label(remote), "paypalTotal": paypal_total, "deskTotal": saved.get("total") if saved.get("id") else None}
+
+
+@app.post("/api/paypal/webhook")
+async def paypal_webhook(request: Request):
+    try:
+        event = await request.json()
+    except Exception:
+        return {"ok": True}
+    if not isinstance(event, dict):
+        return {"ok": True}
+    if not await paypal.verify_webhook(dict(request.headers), event):
+        raise HTTPException(status_code=400, detail="PayPal did not verify that webhook")
+    resource = event.get("resource") if isinstance(event.get("resource"), dict) else {}
+    order_id = webhook_order_id(str(event.get("event_type") or ""), resource)
+    if not order_id or not paypal.ready():
+        return {"ok": True}
+    try:
+        remote = await paypal.get_order(order_id)
+    except httpx.HTTPError:
+        return {"ok": True}
+    label = paypal_label(remote)
+    _capture_id, amount = capture_bits(remote)
+    saved = get_order(order_id)
+    if saved.get("id"):
+        status = "refunded" if label == "REFUNDED" else "paid" if label == "COMPLETED" else saved.get("status") or "created"
+        remember_capture(saved, _capture_id, amount, status)
+    return {"ok": True}
 
 
 @app.post("/api/orders/{order_id}/capture")
@@ -281,25 +337,20 @@ async def capture(order_id: str):
         except httpx.HTTPError:
             remote = {}
         if remote.get("status") == "COMPLETED" and saved.get("id"):
-            capture_id, _amount = capture_bits(remote)
-            saved["status"] = "paid"
-            saved["capture_id"] = capture_id
-            save_order(saved)
+            capture_id, amount = capture_bits(remote)
+            remember_capture(saved, capture_id, amount)
             return _saved_capture(saved)
         raise HTTPException(status_code=502, detail=paypal_message(exc)) from exc
-    capture_id, _amount = capture_bits(captured)
+    capture_id, amount = capture_bits(captured)
     if saved.get("id"):
-        saved["status"] = "paid"
-        saved["capture_id"] = capture_id
-        save_order(saved)
+        remember_capture(saved, capture_id, amount)
         return _saved_capture(saved)
-    units = captured.get("purchase_units") or [{}]
-    amount = (units[0].get("amount") or {}).get("value")
     return {
         "ok": True,
         "orderId": order_id,
         "captureId": capture_id,
         "total": float(amount or 0),
+        "paypalTotal": float(amount) if amount is not None else None,
         "clearCart": True,
         "lines": [],
     }
