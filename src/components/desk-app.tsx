@@ -7,7 +7,8 @@ import { useDesk } from "@/lib/use-desk";
 import { ProductCard } from "@/components/product-card";
 import { CartPanel } from "@/components/cart-panel";
 import { WebCard } from "@/components/web-card";
-import { adviseStore, capturePaypal, paypalStatus, refundPaypal, searchWeb, serviceHealth, startCheckout } from "@/lib/paypal";
+import { adviseStore, capturePaypal, paypalStatus, refundPaypal, runAgent, searchWeb, serviceHealth, startCheckout } from "@/lib/paypal";
+import type { PayConfirm } from "@/lib/paypal";
 
 const STARTERS = [
   { label: "Earbuds under $80", run: "Noise-cancelling earbuds under 80" },
@@ -126,6 +127,30 @@ export function DeskApp() {
       setBusy(null);
       return;
     }
+    if ((result.webQuery || (result.polish && result.recommendId)) && result.turnId) {
+      setBusy("Asking Grok");
+      const agent = await runAgent({ message: text, budget: useDesk.getState().budget, intent: "shop" });
+      if (agent.ok && agent.text && agent.steps?.length) {
+        const confirm = agent.confirm;
+        replaceTurn(result.turnId, agent.text, {
+          steps: agent.steps,
+          hits: agent.hits?.length ? agent.hits : undefined,
+          productIds: agent.productIds?.length ? agent.productIds : undefined,
+          recommendId: agent.recommendId,
+          recommendStore: agent.store,
+          stores: agent.recommendId && agent.store ? { [agent.recommendId]: agent.store } : undefined,
+          confirm,
+          actions: confirm
+            ? [{ label: "Yes, open PayPal", run: "confirm-paypal" }]
+            : agent.recommendId && agent.store
+              ? [{ label: "Yes, open PayPal", run: "stage-paypal" }]
+              : undefined,
+        });
+        setBusy(null);
+        return;
+      }
+      setBusy(null);
+    }
     if (result.webQuery && result.turnId) {
       setBusy("Asking Channel3");
       const found = await searchWeb(result.webQuery, useDesk.getState().budget);
@@ -166,6 +191,53 @@ export function DeskApp() {
     } finally {
       setBusy(null);
     }
+  }
+
+  async function confirmPay(confirm: PayConfirm) {
+    const state = useDesk.getState();
+    if (!state.shipTo) {
+      setAddressOpen(true);
+      note("PayPal needs a ship-to address before it can open.");
+      return;
+    }
+    setPaying(true);
+    const opened = await startCheckout(
+      confirm.webId
+        ? { webId: confirm.webId, budget: state.budget, address: state.shipTo }
+        : {
+            lines: [{ productId: confirm.productId || "", qty: 1, store: confirm.store }],
+            budget: state.budget,
+            address: state.shipTo,
+          },
+    );
+    if (opened.approveUrl) {
+      if (opened.orderId) note(`Opened PayPal order ${opened.orderId}.`, ["create_paypal_order", opened.orderId]);
+      window.location.href = opened.approveUrl;
+      return;
+    }
+    setPaying(false);
+    note(opened.error || "PayPal did not open.");
+  }
+
+  async function stageThenPay(turnId: string) {
+    const turn = useDesk.getState().turns.find((row) => row.id === turnId);
+    if (!turn?.recommendId || !turn.recommendStore) return;
+    setBusy("Asking Grok");
+    const agent = await runAgent({
+      message: `Open PayPal for ${turn.recommendId} from ${turn.recommendStore}`,
+      budget: useDesk.getState().budget,
+      intent: "pay",
+    });
+    setBusy(null);
+    if (!agent.ok || !agent.confirm) {
+      note(agent.error || "Grok did not call create_paypal_order.");
+      return;
+    }
+    replaceTurn(turnId, agent.text || turn.text, {
+      steps: [...(turn.steps ?? []), ...(agent.steps ?? ["create_paypal_order"])],
+      confirm: agent.confirm,
+    });
+    await confirmPay(agent.confirm);
   }
 
   async function checkout() {
@@ -364,7 +436,17 @@ export function DeskApp() {
                         <button
                           key={action.run}
                           type="button"
-                          onClick={() => void submit(action.run, action.label)}
+                          onClick={() => {
+                            if (action.run === "confirm-paypal" && turn.confirm) {
+                              void confirmPay(turn.confirm);
+                              return;
+                            }
+                            if (action.run === "stage-paypal") {
+                              void stageThenPay(turn.id);
+                              return;
+                            }
+                            void submit(action.run, action.label);
+                          }}
                           className="min-h-11 rounded-full border border-line bg-sheet px-4 text-sm font-medium"
                         >
                           {action.label}

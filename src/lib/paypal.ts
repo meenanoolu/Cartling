@@ -1,5 +1,7 @@
 import type { CartLine, Order, OrderLine, ShipTo } from "@/lib/desk-engine";
 
+export type WebOffer = { id: string; store: string; price: number };
+
 export type WebHit = {
   id: string;
   name: string;
@@ -7,6 +9,15 @@ export type WebHit = {
   store: string;
   image: string;
   blurb: string;
+  offers?: WebOffer[];
+};
+
+export type PayConfirm = {
+  productId?: string;
+  store?: string;
+  webId?: string;
+  name?: string;
+  price?: number;
 };
 
 export type Health = { paypal: boolean; grok: boolean; channel3: boolean };
@@ -97,6 +108,51 @@ export async function refundPaypal(orderId: string): Promise<{ ok: boolean; erro
     return { ok: true };
   } catch {
     return { ok: false, error: "PayPal refund did not answer" };
+  }
+}
+
+export async function runAgent(body: { message: string; budget: number; intent?: "shop" | "pay" }): Promise<{
+  ok: boolean;
+  text?: string;
+  steps?: string[];
+  hits?: WebHit[];
+  productIds?: string[];
+  recommendId?: string;
+  store?: string;
+  confirm?: PayConfirm;
+  error?: string;
+}> {
+  try {
+    const res = await fetch("/api/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(45000),
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      text?: string;
+      steps?: string[];
+      hits?: WebHit[];
+      productIds?: string[];
+      recommendId?: string;
+      store?: string;
+      confirm?: PayConfirm;
+      error?: string;
+    };
+    if (!res.ok || !data.ok || !data.text) return { ok: false, error: data.error || "Grok did not answer" };
+    return {
+      ok: true,
+      text: data.text,
+      steps: data.steps,
+      hits: data.hits,
+      productIds: data.productIds,
+      recommendId: data.recommendId,
+      store: data.store,
+      confirm: data.confirm,
+    };
+  } catch {
+    return { ok: false, error: "Grok did not answer" };
   }
 }
 

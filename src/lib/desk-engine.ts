@@ -41,8 +41,9 @@ export type Turn = {
   recommendStore?: string;
   stores?: Record<string, string>;
   actions?: TurnAction[];
-  hits?: { id: string; name: string; price: number; store: string; image: string; blurb: string }[];
+  hits?: { id: string; name: string; price: number; store: string; image: string; blurb: string; offers?: { id: string; store: string; price: number }[] }[];
   steps?: string[];
+  confirm?: { productId?: string; store?: string; webId?: string; name?: string; price?: number };
 };
 
 export type ShipTo = {
