@@ -80,7 +80,8 @@ def remember_web(hits: list[dict]) -> list[dict]:
     for hit in hits:
         name = str(hit.get("name") or "Offer")[:120]
         image = hit.get("image") or ""
-        blurb = str(hit.get("description") or "Live offer from Channel3.")[:180]
+        blurb = str(hit.get("description") or "Live offer from Channel3.")[:800]
+        features = [str(item)[:180] for item in hit.get("features") or [] if str(item).strip()][:6]
         raw_offers = hit.get("offers") if isinstance(hit.get("offers"), list) else []
         if not raw_offers and hit.get("best_price") is not None:
             raw_offers = [{"store": hit.get("best_store") or "Store", "price": hit.get("best_price")}]
@@ -123,6 +124,7 @@ def remember_web(hits: list[dict]) -> list[dict]:
                 "store": first["store"],
                 "image": image,
                 "blurb": blurb,
+                "features": features,
                 "offers": saved,
             }
         )

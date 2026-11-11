@@ -26,6 +26,22 @@ def _store(offer: dict) -> str:
     return text[:60] or "Store"
 
 
+def _features(product: dict) -> list:
+    raw = product.get("features") or product.get("key_features") or product.get("highlights") or []
+    if isinstance(raw, str):
+        raw = [part.strip() for part in raw.split("\n") if part.strip()]
+    if not isinstance(raw, list):
+        return []
+    found = []
+    for item in raw:
+        if isinstance(item, dict):
+            item = item.get("text") or item.get("name") or item.get("value")
+        text = str(item or "").strip()
+        if text:
+            found.append(text[:180])
+    return found[:6]
+
+
 def _image(product: dict):
     raw = product.get("image")
     images = product.get("images") or []
@@ -91,7 +107,8 @@ async def search_and_compare(query: str, max_price: float) -> dict:
             {
                 "id": product.get("id") or str(product.get("title") or "")[:40],
                 "name": product.get("title") or "Unknown",
-                "description": str(product.get("description") or "")[:200],
+                "description": str(product.get("description") or "")[:800],
+                "features": _features(product),
                 "offers": offers,
                 "best_price": cheapest["price"],
                 "best_store": cheapest["store"],
