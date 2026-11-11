@@ -28,17 +28,17 @@ The browser never sends a price.
 
 ## Grok
 
-[app/desk_data.py](app/desk_data.py) calls the xAI API with the allowed stores and no others. The reply has to name one of those stores. The price on screen stays the catalog price. If Grok does not answer, the desk still picks the cheaper or faster store from the same rules.
+[app/desk_data.py](app/desk_data.py) calls the xAI API with three tools: `check_catalog`, `ask_channel3`, and `create_paypal_order`. The catalog tool returns the aisle prices. Channel3 is used only when the aisle has no match. `create_paypal_order` proposes an order and does not open PayPal. The Yes button is what opens it, at the server price. Grok cannot invent a price, a store, or a delivery date. If Grok does not answer, the desk still picks the cheaper or faster store from the same rules.
 
 ## Channel3
 
-[app/catalog.py](app/catalog.py) calls `POST https://api.trychannel3.com/v1/search` only when the local aisle has nothing that matches. The price on the card is the price that gets charged.
+[app/catalog.py](app/catalog.py) calls `POST https://api.trychannel3.com/v1/search` only when the local aisle has nothing that matches. Every merchant under the ceiling is shown. PayPal charges the row you pick.
 
 ## Try it
 
 1. Set a ceiling.
 2. Ask for noise-cancelling earbuds under 80, or a cable in 3 days. A day ask opens the address form first.
-3. The steps under the reply show the catalog check, the store that was kept, and any ceiling refusal.
+3. The steps under the reply name the tools Grok called. Yes opens PayPal only after `create_paypal_order`.
 4. Add it. The cart will not go over the ceiling.
 5. Pay with a PayPal sandbox buyer. The receipt id is the PayPal order id.
 6. Ask where the order is.
