@@ -322,7 +322,7 @@ export function DeskApp() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-paper text-ink">
       <header className="border-b border-line">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+        <div className="flex w-full items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -403,7 +403,7 @@ export function DeskApp() {
             ))}
           </nav>
         </aside>
-        <div className="mx-auto grid w-full min-w-0 max-w-6xl min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="grid w-full min-w-0 min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="flex min-h-0 flex-col overflow-hidden">
           <div ref={threadRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
             {turns.length === 0 ? (
@@ -574,7 +574,7 @@ export function DeskApp() {
           </div>
         </section>
 
-        <aside className="hidden min-h-0 overflow-y-auto border-l border-line lg:block">
+        <aside className="hidden min-h-0 w-80 shrink-0 overflow-y-auto border-l border-line lg:block">
           <div className="p-4">{cart}</div>
         </aside>
       </div>
