@@ -11,11 +11,8 @@ import { adviseStore, capturePaypal, paypalStatus, refundPaypal, runAgent, searc
 import type { PayConfirm } from "@/lib/paypal";
 
 const STARTERS = [
-  { label: "Earbuds under $80", run: "Noise-cancelling earbuds under 80" },
+  { label: "Earbuds and a cable before Friday", run: "earbuds and a usb-c cable in 3 days under 80" },
   { label: "Cable in 3 days", run: "USB-C cable in 3 days" },
-  { label: "Desk setup under $60", run: "Desk setup under 60" },
-  { label: "Travel kit in 3 days", run: "Travel kit in 3 days under 130" },
-  { label: "Compare buds and headphones", run: "Compare earbuds and headphones" },
   { label: "Mug under $20", run: "Ceramic mug under 20" },
 ];
 
@@ -132,23 +129,36 @@ export function DeskApp() {
       setBusy("Asking Grok");
       const agent = await runAgent({ message: text, budget: useDesk.getState().budget, intent: "shop" });
       if (agent.ok && agent.text && agent.steps?.length) {
-        const confirm = agent.confirm;
-        replaceTurn(result.turnId, agent.text, {
-          steps: agent.steps,
-          hits: agent.hits?.length ? agent.hits : undefined,
-          productIds: agent.productIds?.length ? agent.productIds : undefined,
-          recommendId: agent.recommendId,
-          recommendStore: agent.store,
-          stores: agent.recommendId && agent.store ? { [agent.recommendId]: agent.store } : undefined,
-          confirm,
-          actions: confirm
-            ? [{ label: "Yes, open PayPal", run: "confirm-paypal" }]
-            : agent.recommendId && agent.store
-              ? [{ label: "Yes, open PayPal", run: "stage-paypal" }]
-              : undefined,
-        });
-        setBusy(null);
-        return;
+        const existing = useDesk.getState().turns.find((row) => row.id === result.turnId);
+        const hasCards = Boolean(agent.hits?.length || agent.productIds?.length || existing?.productIds?.length);
+        const dump = agent.text.length > 220 && !agent.confirm;
+        if (hasCards || !dump) {
+          const spoken = hasCards && dump
+            ? agent.hits?.length
+              ? "Channel3 returned these. Open Description on a card, then pick a merchant."
+              : "These fit. The price is the catalog price. PayPal stays closed until you say yes."
+            : agent.text;
+          const localIds = existing?.productIds ?? [];
+          const agentIds = agent.productIds ?? [];
+          const productIds = localIds.length > agentIds.length ? localIds : agentIds;
+          const confirm = agent.confirm;
+          replaceTurn(result.turnId, spoken, {
+            steps: agent.steps,
+            ...(agent.hits?.length ? { hits: agent.hits } : {}),
+            ...(productIds.length ? { productIds } : {}),
+            recommendId: agent.recommendId ?? existing?.recommendId,
+            recommendStore: agent.store ?? existing?.recommendStore,
+            stores: agent.recommendId && agent.store ? { ...(existing?.stores ?? {}), [agent.recommendId]: agent.store } : existing?.stores,
+            confirm,
+            actions: confirm
+              ? [{ label: "Yes, open PayPal", run: "confirm-paypal" }]
+              : agent.recommendId && agent.store
+                ? [{ label: "Yes, open PayPal", run: "stage-paypal" }]
+                : undefined,
+          });
+          setBusy(null);
+          return;
+        }
       }
       setBusy(null);
     }
@@ -409,11 +419,17 @@ export function DeskApp() {
             {turns.length === 0 ? (
               <div className="flex flex-col gap-5">
                 <h1 className="max-w-xl font-display text-4xl leading-tight font-medium sm:text-5xl">
-                  The annoying parts, handled before you pay.
+                  Before Friday. Under $80.
                 </h1>
                 <p className="max-w-xl text-lg leading-relaxed text-muted">
-                  One desk instead of a pile of tabs. The cheap store and the fast store stay separate. The ceiling refuses the extra, and a refund forgets you owned it. Pay uses a PayPal sandbox buyer, not a real PayPal login.
+                  Maya needs earbuds and a cable. The cheap store takes five days. The fast one may not fit the ceiling. The total is not in any tab.
                 </p>
+                <ul className="max-w-xl list-disc pl-5 text-sm leading-relaxed text-muted">
+                  <li>The ceiling holds. Over it, PayPal does not open.</li>
+                  <li>A day is that store's handoff time, not a guess.</li>
+                  <li>Grok can pick a store. It cannot type the price.</li>
+                  <li>PayPal stays closed until you say yes.</li>
+                </ul>
                 <div className="flex flex-wrap gap-2">
                   {STARTERS.map((prompt) => (
                     <button
