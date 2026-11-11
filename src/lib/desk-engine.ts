@@ -528,8 +528,11 @@ export function interpret(raw: string, desk: DeskSnapshot): EngineResult {
   }
 
   const topScore = explicit[0]!.score;
-  let picks = explicit.filter((row) => row.score >= topScore - 1).map((row) => row.product);
-  if (explicit.length >= 2 && explicit[0]!.score > explicit[1]!.score + 1) picks = [explicit[0]!.product];
+  const joined = /\band\b/.test(text) && explicit.filter((row) => row.score >= 2).length >= 2;
+  let picks = joined
+    ? explicit.filter((row) => row.score >= 2).slice(0, 2).map((row) => row.product)
+    : explicit.filter((row) => row.score >= topScore - 1).map((row) => row.product);
+  if (!joined && explicit.length >= 2 && explicit[0]!.score > explicit[1]!.score + 1) picks = [explicit[0]!.product];
 
   const skippedOwned = picks.filter((product) => owned.has(product.id) && !/\b(again|another|second|replace)\b/.test(text));
   const fresh = picks.filter((product) => !skippedOwned.includes(product));
