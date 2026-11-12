@@ -160,7 +160,7 @@ export function DeskApp() {
             : agent.text;
           const localIds = existing?.productIds ?? [];
           const agentIds = agent.productIds ?? [];
-          const productIds = localIds.length > agentIds.length ? localIds : agentIds;
+          const productIds = agent.hits?.length ? [] : localIds.length > agentIds.length ? localIds : agentIds;
           const confirm = agent.confirm;
           replaceTurn(result.turnId, spoken, {
             steps: agent.steps,

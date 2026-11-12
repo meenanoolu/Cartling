@@ -135,6 +135,24 @@ function scored(text: string): { product: Product; score: number }[] {
     .sort((a, b) => b.score - a.score);
 }
 
+function asksBeyondAisle(text: string, matches: Product[]): boolean {
+  if (!matches.length) return false;
+  let rest = text;
+  for (const product of matches) {
+    rest = rest.replace(product.name.toLowerCase(), " ");
+    rest = rest.replace(product.id, " ");
+    for (const alias of product.aliases) {
+      rest = rest.replace(new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g"), " ");
+    }
+  }
+  rest = rest
+    .replace(/\b(and|the|a|an|for|me|please|show|find|need|want|some|something|with|from|that|this|under|below|max(?:imum)?|budget|ceiling|less|than|within|days?|before|by|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|overnight|asap|rush|weekend|cheap|cheaper|fast|faster|soon|pair|pairs|set|commute|only|dollars?|in|on|to|of|my|get|buy|add|take|shipping|ship|today|after)\b/g, " ")
+    .replace(/\$?\d+(?:\.\d{1,2})?/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return rest.split(/\s+/).some((word) => word.length > 2);
+}
+
 function readBudget(text: string): number | null {
   const labeled = text.match(
     /(?:under|below|max(?:imum)?|budget|ceiling|less than|within|up to|only)\s*\$?\s*(\d+(?:\.\d{1,2})?)/,
@@ -391,6 +409,14 @@ export function interpret(raw: string, desk: DeskSnapshot): EngineResult {
   }
 
   const explicit = scored(text);
+  if (asksBeyondAisle(text, explicit.map((row) => row.product))) {
+    return {
+      say: "That names a real product, so the sample aisle stays closed. Asking Channel3.",
+      webQuery: raw.trim(),
+      budget: stated ?? undefined,
+      polish: false,
+    };
+  }
 
   if (/\bcompare\b/.test(text) && explicit.length >= 2) {
     const [first, second] = [explicit[0]!.product, explicit[1]!.product];

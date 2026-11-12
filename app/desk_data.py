@@ -277,11 +277,20 @@ def _named_ceiling(text: str, budget: float) -> float:
     return min(2000, max(1, ceiling))
 
 
+GENERIC = {
+    "under", "below", "days", "day", "with", "from", "that", "this", "need", "want",
+    "please", "open", "paypal", "before", "after", "friday", "monday", "tuesday",
+    "wednesday", "thursday", "saturday", "sunday", "tomorrow", "overnight", "asap",
+    "rush", "cheap", "cheaper", "fast", "faster", "soon", "pair", "pairs", "and",
+    "the", "for", "only", "dollars", "weekend", "today", "shipping", "ship",
+}
+
+
 def _check_catalog(query: str, ceiling: float, day_limit: Optional[int]) -> dict:
     words = [word for word in re.findall(r"[a-z0-9]+", query.lower()) if len(word) > 2]
-    stop = {"under", "below", "days", "with", "from", "that", "this", "need", "want", "please", "open", "paypal"}
-    words = [word for word in words if word not in stop]
+    words = [word for word in words if word not in GENERIC]
     found = []
+    blobs = []
     for product in load_catalog():
         blob = f"{product['id']} {product['name']}".lower()
         if words and not any(word in blob for word in words):
@@ -303,6 +312,12 @@ def _check_catalog(query: str, ceiling: float, day_limit: Optional[int]) -> dict
         if not offers:
             continue
         found.append({"product_id": product["id"], "name": product["name"], "offers": offers})
+        blobs.append(blob)
+    covered = set()
+    for blob in blobs:
+        covered.update(re.findall(r"[a-z0-9]+", blob))
+    if any(word not in covered for word in words):
+        return {"products": []}
     return {"products": found[:6]}
 
 
