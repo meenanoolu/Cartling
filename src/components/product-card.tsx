@@ -32,6 +32,7 @@ export function ProductCard({
           <p className="shrink-0 text-lg font-medium tabular-nums">{money(primary.price)}</p>
         </div>
         <p className="text-sm leading-relaxed text-muted">{product.blurb}</p>
+        <p className="text-sm text-muted">Sample store. The desk sets this price.</p>
         <ul className="flex flex-col gap-1 text-sm">
           {offers.map((row) => {
             const tags = [

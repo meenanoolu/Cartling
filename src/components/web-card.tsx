@@ -33,7 +33,7 @@ export function WebCard({ hit, onPay }: { hit: WebHit; onPay: (id: string) => vo
             ) : null}
           </details>
         ) : null}
-        <p className="text-sm text-muted">Channel3</p>
+        <p className="text-sm text-muted">Live merchant. PayPal charges this row.</p>
         {offers.map((offer) => (
           <button
             key={offer.id}
