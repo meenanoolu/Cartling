@@ -10,6 +10,8 @@ If you name a brand or a model, even in the same sentence as earbuds, that searc
 
 Live demo: https://cartling.onrender.com
 
+Demo video: https://www.youtube.com/watch?v=4415FV9gPHY
+
 ## What to try
 
 1. Set a ceiling.
