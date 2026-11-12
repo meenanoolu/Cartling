@@ -1,10 +1,11 @@
 import { money } from "@/lib/catalog";
 import type { WebHit } from "@/lib/paypal";
 
-export function WebCard({ hit, onPay }: { hit: WebHit; onPay: (id: string) => void }) {
+export function WebCard({ hit, onAdd, onPay }: { hit: WebHit; onAdd?: (hit: WebHit) => void; onPay: (id: string) => void }) {
   const offers = hit.offers && hit.offers.length ? hit.offers : [{ id: hit.id, store: hit.store, price: hit.price }];
   const several = offers.length > 1;
   const features = (hit.features ?? []).filter(Boolean);
+  const primary = offers[0]!;
 
   return (
     <article className="flex flex-col overflow-hidden rounded-card border border-line bg-sheet">
@@ -33,17 +34,25 @@ export function WebCard({ hit, onPay }: { hit: WebHit; onPay: (id: string) => vo
             ) : null}
           </details>
         ) : null}
-        <p className="text-sm text-muted">Live merchant. PayPal charges this row.</p>
-        {offers.map((offer) => (
+        <p className="text-sm text-muted">Live merchant. Price is fixed on this row.</p>
+        <div className="mt-auto flex flex-col gap-2">
+          {onAdd ? (
+            <button
+              type="button"
+              onClick={() => onAdd(hit)}
+              className="min-h-11 rounded-xl border border-line bg-paper px-4 py-2 font-medium text-ink"
+            >
+              Add to cart · {money(primary.price)}
+            </button>
+          ) : null}
           <button
-            key={offer.id}
             type="button"
-            onClick={() => onPay(offer.id)}
-            className="min-h-11 rounded-xl bg-brass px-4 py-2 text-left font-medium text-on-brass"
+            onClick={() => onPay(primary.id)}
+            className="min-h-11 rounded-xl bg-brass px-4 py-2 font-medium text-on-brass"
           >
-            {several ? `Pay ${offer.store} ${money(offer.price)}` : `Pay ${money(offer.price)} with PayPal`}
+            Pay {money(primary.price)} with PayPal
           </button>
-        ))}
+        </div>
       </div>
     </article>
   );
