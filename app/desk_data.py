@@ -358,6 +358,13 @@ def _known_prices(products: list, hits: list) -> set:
     return known
 
 
+def _unknown_price(text: str, known: set) -> bool:
+    for found in re.findall(r"\$(\d+(?:\.\d{1,2})?)", text or ""):
+        if f"{float(found):.2f}" not in known:
+            return True
+    return False
+
+
 def _safe_text(text: str, known: set) -> str:
     cleaned = re.sub(r"\s+", " ", text or "").strip()
     if not cleaned:
@@ -430,7 +437,12 @@ async def shop_with_grok(message: str, budget: float, intent: str = "shop") -> d
         assistant = choice.get("message") or {}
         calls = assistant.get("tool_calls") or []
         if not calls:
-            spoken = _safe_text(str(assistant.get("content") or ""), _known_prices(products, hits))
+            raw = str(assistant.get("content") or "")
+            known = _known_prices(products, hits)
+            spoken = _safe_text(raw, known)
+            if raw.strip() and not spoken and _unknown_price(raw, known):
+                steps.append("Dropped a price that was not on a row.")
+                spoken = "A price in that sentence was not on a row, so it was dropped."
             break
         messages.append(
             {
@@ -448,13 +460,16 @@ async def shop_with_grok(message: str, budget: float, intent: str = "shop") -> d
                 args = {}
             if not isinstance(args, dict):
                 args = {}
+            if "price" in args:
+                steps.append("Ignored a price the model tried to pass.")
+                args = {key: value for key, value in args.items() if key != "price"}
             if name == "check_catalog":
-                steps.append("check_catalog")
+                steps.append("Checked the aisle. That tool has no price field.")
                 result = _check_catalog(str(args.get("query") or text), ceiling, day_limit)
                 products = result["products"]
                 aisle_has_match = bool(products)
             elif name == "ask_channel3":
-                steps.append("ask_channel3")
+                steps.append("Asked Channel3. The price on the card is the merchant price.")
                 if aisle_has_match:
                     result = {"ok": False, "error": "The aisle already has a match. Use check_catalog."}
                 else:
@@ -473,7 +488,7 @@ async def shop_with_grok(message: str, budget: float, intent: str = "shop") -> d
                             )
                     result = {"ok": found.get("ok", False), "offers": flat[:12], "error": found.get("error")}
             elif name == "create_paypal_order":
-                steps.append("create_paypal_order")
+                steps.append("Proposed an order with a product and a store. PayPal stays closed.")
                 result = _stage_order(args, ceiling, day_limit)
                 if result.get("confirm"):
                     confirm = result["confirm"]
