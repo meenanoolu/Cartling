@@ -1,6 +1,10 @@
 # Cartling
 
-A shopping desk that keeps the cheap store and the fast store apart, refuses anything over your ceiling, then charges that exact total through PayPal sandbox.
+Cartling is a shopping desk. You name a thing, a ceiling, and a day. It keeps the cheap store and the fast store apart, refuses anything over the ceiling, and charges that exact total through PayPal sandbox.
+
+The model can pick a store. It cannot set a price. The tools take a product and a store, or a Channel3 id. They have no price field. A dollar amount that is not already on a row is dropped, and PayPal is not opened.
+
+The aisle is a priced catalog. BudgetBuy, GadgetHub, and TechStore are sample stores, and the photos are samples. The server owns those prices. When the item is not in the aisle, Channel3 returns live merchants, and PayPal charges the price on that row.
 
 Live demo: https://cartling.onrender.com
 
@@ -8,7 +12,7 @@ Live demo: https://cartling.onrender.com
 
 1. Set a ceiling.
 2. Ask for noise-cancelling earbuds under 80, or a cable in 3 days.
-3. Grok picks one store from the card. The price stays the catalog price.
+3. Grok picks one store from the card. It cannot type the price.
 4. Add it. The cart will not go over the ceiling.
 5. Pay with PayPal and approve as a sandbox buyer. The receipt id is the PayPal order id.
 6. Refund. PayPal sends the money back and the desk forgets you owned it.
@@ -37,7 +41,7 @@ Open http://localhost:8000
 
 ## Stack
 
-- Rules for the ceiling, ship days and sets live in the desk so a model cannot invent a price
+- Rules for the ceiling, ship days and sets live in the desk. The model can choose a store and cannot choose a price
 - Grok, through the xAI API, chooses the store and writes one sentence
 - Channel3 searches when the aisle does not have the thing
 - PayPal Orders v2 sandbox creates the order, the buyer approves it, then Cartling captures and can refund
