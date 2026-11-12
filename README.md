@@ -6,7 +6,7 @@ The model can pick a store. It cannot set a price. The tools take a product and 
 
 The aisle is a priced catalog. BudgetBuy, GadgetHub, and TechStore are sample stores, and the photos are samples. The server owns those prices. When the item is not in the aisle, Channel3 returns live merchants, and PayPal charges the price on that row.
 
-Channel3 is not used for every item. A live row is a merchant and a price, and that price can change on the next search. The aisle row also has a handoff day, so "before Friday" can drop the cheap store and keep the fast one. The earbuds and the cable stay on the aisle for that reason. A keyboard or a mug is not in the file, so those go to Channel3.
+If you name a brand or a model, even in the same sentence as earbuds, that search goes to Channel3. The sample aisle is only the generic item, such as earbuds and a cable before Friday. A live row does not keep the handoff day, so the Friday choice stays on the aisle.
 
 Live demo: https://cartling.onrender.com
 
