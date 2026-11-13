@@ -2,6 +2,15 @@
 
 Cartling is a shopping desk. You name a thing, a ceiling, and a day. It keeps the cheap store and the fast store apart, refuses anything over the ceiling, and charges that exact total through PayPal sandbox.
 
+## Recent improvements (feature/real-cart-taxes-shipping)
+
+- Channel3 / live merchant products now support **Add to Cart** in addition to direct Pay. You can add multiple items, from different stores, and adjust quantities.
+- Cart groups items by store (each store is a separate package).
+- Realistic **shipping fees** are calculated: $5.99 per package (unique store), free shipping on packages over $75.
+- **Sales tax** is calculated based on ship-to address (US states have rates; international is 0%).
+- Grand total (items + shipping + tax) is sent to PayPal with proper breakdown.
+- Server still owns prices; model cannot invent them.
+
 The model can pick a store. It cannot set a price. The tools take a product and a store, or a Channel3 id. They have no price field. A dollar amount that is not already on a row is dropped, and PayPal is not opened.
 
 The aisle is a priced catalog. BudgetBuy, GadgetHub, and TechStore are sample stores, and the photos are samples. The server owns those prices. When the item is not in the aisle, Channel3 returns live merchants, and PayPal charges the price on that row.
@@ -20,7 +29,7 @@ Demo video: https://www.youtube.com/watch?v=4415FV9gPHY
 4. Add it. The cart will not go over the ceiling.
 5. Pay with PayPal and approve as a sandbox buyer. The receipt id is the PayPal order id.
 6. Refund. PayPal sends the money back and the desk forgets you owned it.
-7. Ask for something outside the aisle, such as a mechanical keyboard under 120. Channel3 returns live offers and PayPal charges that price.
+7. Ask for something outside the aisle, such as a mechanical keyboard under 120. Channel3 returns live offers. **Add to cart** (or pay directly). Multiple items from different stores are supported. Taxes and shipping are calculated on checkout.
 
 ## Keys
 
@@ -42,6 +51,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Open http://localhost:8000
+
+For the frontend source changes, rebuild the static assets (Vite/TanStack setup) and commit the new `app/static/assets/` bundles if deploying.
 
 ## Stack
 
